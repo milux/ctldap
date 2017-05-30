@@ -10,7 +10,7 @@ http://nodejs.org/
 
 ## Node.js install
 
-### To install the server on a linux machine with root access, run the install.sh script as root user. It will
+### Run the install.sh script as root user. It will
 - run "npm install" to install required Node.js dependencies for the server
 - create a new user "ctldap" to run the server with limited privileges
 - create log/error log files for stdout/stderr output and set the required ownership attributes
