@@ -2,7 +2,7 @@
 
 This software acts as an LDAP server for ChurchTools version 3.x
 
-**This software was tested in a common enviroment, yet no warranties of any kind!** 
+**This software was tested in a common environment, yet no warranties of any kind!** 
 
 # Installation
 Node.js is required to run this software.
@@ -31,3 +31,16 @@ Usage: ctldap.sh {start|stop|status|restart}
 ## PHP API install
 - copy the contents of "php_api" to the root folder of your ChurchTools installation (the composer.* files can be safely ignored)
 - copy the line "api_key=<random_20_char_string>" from your "ctldap.config" to your ChuchTools configuration at /sites/[default|subdomain]/churchtools.config
+
+# Usage
+The LDAP DNs depend on your configuration. We assume the following configuration:
+```
+ldap_user=root
+ldap_password=0a1b2c3d4e5f6g7h8i9j
+ldap_base_dn=churchtools
+```
+For this configuration, the
+- admin DN for initial binding is `cn=root,ou=users,o=churchtools`
+- password for initial binding is `0a1b2c3d4e5f6g7h8i9j`
+- users are found in the organizational unit `ou=users,o=churchtools`
+- groups are found in the organizational unit `ou=groups,o=churchtools`
