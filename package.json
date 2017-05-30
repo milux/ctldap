@@ -2,7 +2,7 @@
   "name": "ctldap",
   "license": "GPL-3.0",
   "description": "LDAP Wrapper for ChurchTools",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "dependencies": {
     "bluebird": "^3.5.0",
