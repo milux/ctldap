@@ -1,5 +1,18 @@
 <?php
+// register composer class loader
 require __DIR__ . '/vendor/autoload.php';
+
+//add class path to include paths
+set_include_path(realpath(__DIR__ . DIRECTORY_SEPARATOR . 'api_classes') . PATH_SEPARATOR . get_include_path());
+
+/**
+ * Register class loader for project classes
+ *
+ * @param string $c class name
+ */
+spl_autoload_register(function($c) {
+	include strtr($c, array('\\' => DIRECTORY_SEPARATOR)) . '.php';
+});
 
 //include SPDO class
 use milux\spdo\SPDO;
