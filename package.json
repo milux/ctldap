@@ -1,0 +1,17 @@
+{
+  "name": "ctldap",
+  "license": "GPL-3.0",
+  "description": "LDAP Wrapper for ChurchTools",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "bluebird": "^3.5.0",
+    "extend": "^3.0.1",
+    "ini": "^1.1.0",
+    "ldap-escape": "^1.1.4",
+    "ldapjs": "^0.7.0",
+    "request": "^2.81.0",
+    "request-promise": "^4.2.1"
+  },
+  "devDependencies": {}
+}

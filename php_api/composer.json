@@ -1,0 +1,6 @@
+{
+	"require": {
+		"milux/spdo": "^1.0.0",
+		"ircmaxell/password-compat": "^1.0"
+	}
+}
