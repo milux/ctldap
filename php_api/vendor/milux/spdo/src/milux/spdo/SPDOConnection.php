@@ -330,5 +330,15 @@ class SPDOConnection {
 			throw new SPDOException($e);
 		}
 	}
+
+	/**
+	 * Obtain the last insert ID, for a certain object or in general
+	 *
+	 * @param string $insertIdName The name of the column or DB object that is auto-incremented
+	 * @return int The last insert ID
+	 */
+	public function lastInsertId($insertIdName = null) {
+		return $this->pdo->lastInsertId($insertIdName);
+	}
 	
 }

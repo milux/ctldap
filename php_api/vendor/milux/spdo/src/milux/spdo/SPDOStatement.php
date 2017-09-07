@@ -24,7 +24,7 @@ class SPDOStatement {
     private $transformed = false;
     //buffer for iterating with cell()
     private $line = null;
-    
+
     public function __construct($statement) {
 		$this->statement = $statement;
     }
@@ -33,25 +33,24 @@ class SPDOStatement {
 	 * Helper function to bind an array of values to this statement
 	 *
 	 * @param array $toBind Parameters to bind
-	 *
 	 * @return SPDOStatement
 	 */
 	public function bindTyped(array $toBind) {
 		$bindCount = 1;
-		foreach(array_combine(SPDOConnection::getTypes($toBind), $toBind) as $t => $v) {
-			$this->statement->bindValue($bindCount++, $v, $t);
+		$types = SPDOConnection::getTypes($toBind);
+		foreach($toBind as $k => $v) {
+			$this->statement->bindValue($bindCount++, $v, $types[$k]);
 		}
 		return $this;
 	}
-    
+
 	/**
 	 * modified execute() which returns the underlying PDOStatement object on success,
      * thus making the execute command "chainable"
-	 * 
+	 *
 	 * @param mixed $argument [optional] might be an array or
      * the first of an arbitrary number of parameters for binding
-	 *
-	 * @return SPDOStatement
+	 * @return SPDOStatement $this
 	 * @throws SPDOException
 	 */
     public function execute($argument = null) {
@@ -76,7 +75,16 @@ class SPDOStatement {
             throw new SPDOException($e);
         }
     }
-    
+
+    /**
+     * Returns the number of rows affected by the last execution
+     *
+     * @return int
+     */
+    public function rowCount() {
+        return $this->statement->rowCount();
+    }
+
     /**
      * Ensures that data is available for processing
      */
@@ -91,10 +99,10 @@ class SPDOStatement {
             }
         }
     }
-    
+
     /**
      * Helper function to immerse into the nested structure until data dimension after group()
-     * 
+     *
      * @param callback $callback the callback to apply at the innermost dimension
      * @param int $level [optional] the levels to immerse before the callback is applied,
      * defaults to the number of previous group operations
@@ -124,14 +132,13 @@ class SPDOStatement {
         };
         return $immerse($this->data, $callback, $level);
     }
-    
+
     /**
      * Groups data into subarrays by given column name(s),
      * generating nested map (array) structures.
-     * 
-     * @param array $groups
      *
-     * @return SPDOStatement
+     * @param array $groups
+     * @return SPDOStatement $this
      * @throws SPDOException
      */
     public function group(array $groups) {
@@ -189,7 +196,7 @@ class SPDOStatement {
         //return $this for method chaining
         return $this;
     }
-    
+
     public function filter($callback) {
         $this->init();
         //check for empty result
@@ -201,12 +208,12 @@ class SPDOStatement {
         });
         return $this;
     }
-    
+
     /**
      * Sets the PHP data type of specified columns
-     * 
+     *
      * @param array $typeMap map of column names (keys) and types to set (values)
-     * @return SPDOStatement
+     * @return SPDOStatement $this
      * @throws SPDOException
      */
     public function cast($typeMap) {
@@ -230,14 +237,14 @@ class SPDOStatement {
         });
         return $this;
     }
-    
+
     /**
      * Applies callbacks to specified columns<br />
      * ATTENTION: Modifying a column to a non-primitive type and using it for grouping,
      * reducing, etc. can cause undefined behaviour!
-     * 
+     *
      * @param array $callbackMap map of column names (keys) and callbacks to apply (values)
-     * @return SPDOStatement
+     * @return SPDOStatement $this
      * @throws SPDOException
      */
     public function mod($callbackMap) {
@@ -261,14 +268,14 @@ class SPDOStatement {
         });
         return $this;
     }
-    
+
     /**
      * Tranforms the innermost dimension elements (initially maps)
      * by tranforming them with the given callback function.<br />
      * ATTENTION: group(), getObjects() and getUnique(true) cannot be used after this operation!
-     * 
+     *
      * @param callback $callback callback accepting exactly one element
-     * @return SPDOStatement
+     * @return SPDOStatement $this
      */
     public function transform($callback) {
         $this->transformed = true;
@@ -280,10 +287,10 @@ class SPDOStatement {
         });
         return $this;
     }
-    
+
     /**
-     * get next cell of data set
-     * 
+     * Get next cell of data set
+     *
      * @param bool $reset setting this parameter to true will reset the array pointers
      * (required for first call)
      * @return mixed
@@ -291,10 +298,10 @@ class SPDOStatement {
      */
     public function cell($reset = false) {
         if($this->nesting > 0) {
-            throw new SPDOException('Cannot interate over cells after group()!');
+            throw new SPDOException('Cannot iterate cells after group()!');
         }
         if($this->transformed) {
-            throw new SPDOException('Cannot safely interate over cells after transform()!');
+            throw new SPDOException('Cannot safely iterate cells after transform()!');
         }
         $this->init();
         if($reset) {
@@ -321,12 +328,51 @@ class SPDOStatement {
             return $eachIn[1];
         }
     }
-    
+
+	/**
+	 * Get next row of data set
+	 *
+	 * @param bool $reset setting this parameter to true will reset the array pointer
+	 * (required for first call)
+	 * @return mixed
+	 * @throws SPDOException
+	 */
+    public function row($reset = false) {
+	    if($this->nesting > 0) {
+		    throw new SPDOException('Cannot iterate rows after group()!');
+	    }
+	    if($this->line !== null) {
+	    	throw new SPDOException('Cannot iterate rows while iterating cells!');
+	    }
+	    $this->init();
+	    if($reset) {
+		    reset($this->data);
+	    }
+	    $each = each($this->data);
+	    return $each === false ? false : $each[1];
+    }
+
+	/**
+	 * Get next row of data set as
+	 *
+	 * @param bool $reset setting this parameter to true will reset the array pointer
+	 * (required for first call)
+	 * @return mixed
+	 * @throws SPDOException
+	 */
+    public function rowObject($reset = false) {
+	    if($this->transformed) {
+		    throw new SPDOException('Cannot safely cast transformed rows, use transform() to cast!');
+	    }
+	    $row = $this->row($reset);
+	    return $row === false ? false : (object) $row;
+    }
+
     /**
      * Returns the manipulated data as hold in this statement.
      * The innermost dimension usually consists of maps (assoc. arrays).
      * This is different if transform() was called on this statement with non-array callback return type.
-     * 
+     *
      * @param bool $reduce whether to reduce one-element-arrays to their value
      * @return array manipulated data as hold in this statement object
      */
@@ -344,7 +390,7 @@ class SPDOStatement {
             return $this->data;
         }
     }
-    
+
     public function getUnique($reduce = true) {
         if(!$this->transformed && $this->statement->columnCount() === $this->nesting + 1 && $reduce) {
             return $this->immerse(function ($data) {
@@ -366,10 +412,10 @@ class SPDOStatement {
             });
         }
     }
-    
+
     public function getObjects() {
         if($this->transformed) {
-            throw new SPDOException('Cannot safely cast transformed elements, use transform() call for object casting!');
+            throw new SPDOException('Cannot safely cast transformed rows, use transform() to cast!');
         }
         //simply cast to objects
         return $this->immerse(function ($data) {
@@ -379,7 +425,7 @@ class SPDOStatement {
             return $data;
         });
     }
-    
+
     public function getFunc($callback) {
         return $this->immerse(function ($data) use ($callback) {
             foreach($data as &$d) {
@@ -395,9 +441,11 @@ class SPDOStatement {
 	 * @param string $parameter The number/name of the bind parameter
 	 * @param mixed $value The value that is bound
 	 * @param int $data_type The PDO data type
+	 * @return SPDOStatement $this
 	 */
     public function bindValue($parameter, $value, $data_type) {
     	$this->statement->bindValue($parameter, $value, $data_type);
+    	return $this;
     }
 
 }

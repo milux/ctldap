@@ -21,16 +21,10 @@ class API implements ICallable {
 	 * @throws Exception On authentication error
 	 */
     public static function authenticate($user, $password) {
-        // include password_compat wrapper if supported
-        $usePasswordApi = true;
-	    if (!function_exists('password_hash')) {
-            $hash = '$2y$04$use.any.string.for.itu8yjBBIVvIAXzFyRajcNk82tV0qIVxDK';
-            $usePasswordApi = function_exists('crypt') && crypt('password', $hash) === $hash;
-	    }
         $hash = SPDO::prepare("SELECT password FROM #_cdb_person WHERE LOWER(cmsuserid) = LOWER(?)")
 		    ->execute($user)->cell();
 	    $needsRehash = false;
-	    if ($usePasswordApi && password_verify($password, $hash)) {
+	    if (password_verify($password, $hash)) {
 		    if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
 			    $needsRehash = true;
 		    }
@@ -39,7 +33,7 @@ class API implements ICallable {
 	    } else {
 		    throw new Exception("Authentication failed for $user, password invalid!");
 	    }
-	    if ($usePasswordApi && $needsRehash) {
+	    if ($needsRehash) {
 		    $newHash = password_hash($password, PASSWORD_DEFAULT);
 		    SPDO::update('#_cdb_person', array('password' => $newHash),
 			    'LOWER(cmsuserid) = LOWER(?)', array($user));
