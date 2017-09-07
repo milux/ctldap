@@ -6,24 +6,25 @@ namespace Composer\Autoload;
 
 class ComposerStaticInitb99c31cbe15c494b4f0f26db1fbcd68a
 {
-    public static $files = array (
-        'e40631d46120a9c38ea139981f8dab26' => __DIR__ . '/..' . '/ircmaxell/password-compat/lib/password.php',
-    );
-
-    public static $prefixesPsr0 = array (
+    public static $prefixLengthsPsr4 = array (
         'm' => 
         array (
-            'milux' => 
-            array (
-                0 => __DIR__ . '/..' . '/milux/spdo/src',
-            ),
+            'milux\\' => 6,
+        ),
+    );
+
+    public static $prefixDirsPsr4 = array (
+        'milux\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/milux/spdo/src/milux',
         ),
     );
 
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixesPsr0 = ComposerStaticInitb99c31cbe15c494b4f0f26db1fbcd68a::$prefixesPsr0;
+            $loader->prefixLengthsPsr4 = ComposerStaticInitb99c31cbe15c494b4f0f26db1fbcd68a::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInitb99c31cbe15c494b4f0f26db1fbcd68a::$prefixDirsPsr4;
 
         }, null, ClassLoader::class);
     }

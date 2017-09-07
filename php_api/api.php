@@ -1,4 +1,12 @@
 <?php
+/**
+ * Assert required minimal PHP version 5.6.0 as announced here:
+ * https://forum.churchtools.de/topic/3223/minimal-unterstützte-php-version
+ */
+if (!version_compare(PHP_VERSION, '5.6.0', '>=')) {
+    die("Software requires PHP version 5.6.0 or newer");
+}
+
 // register composer class loader
 require __DIR__ . '/vendor/autoload.php';
 

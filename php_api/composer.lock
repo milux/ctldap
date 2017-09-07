@@ -4,63 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "e95121df8451975a1d77f0ee610e2f0e",
-    "content-hash": "f3e03dda3ce94a25a7cc4b1d9196ae0a",
+    "hash": "16dc69f7aec1558a81b752c11ff341cb",
+    "content-hash": "a082bf0309b6305827e15e1bf4a3ccb3",
     "packages": [
         {
-            "name": "ircmaxell/password-compat",
-            "version": "v1.0.4",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/ircmaxell/password_compat.git",
-                "reference": "5c5cde8822a69545767f7c7f3058cb15ff84614c"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/ircmaxell/password_compat/zipball/5c5cde8822a69545767f7c7f3058cb15ff84614c",
-                "reference": "5c5cde8822a69545767f7c7f3058cb15ff84614c",
-                "shasum": ""
-            },
-            "require-dev": {
-                "phpunit/phpunit": "4.*"
-            },
-            "type": "library",
-            "autoload": {
-                "files": [
-                    "lib/password.php"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Anthony Ferrara",
-                    "email": "ircmaxell@php.net",
-                    "homepage": "http://blog.ircmaxell.com"
-                }
-            ],
-            "description": "A compatibility library for the proposed simplified password hashing algorithm: https://wiki.php.net/rfc/password_hash",
-            "homepage": "https://github.com/ircmaxell/password_compat",
-            "keywords": [
-                "hashing",
-                "password"
-            ],
-            "time": "2014-11-20 16:49:30"
-        },
-        {
             "name": "milux/spdo",
-            "version": "1.0.0",
+            "version": "1.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/milux/spdo.git",
-                "reference": "8a275cfb7f061e87211ea8906e42abdfc05ae723"
+                "reference": "134e91d88ef781ec86168adeef8362e50a2d011b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/milux/spdo/zipball/8a275cfb7f061e87211ea8906e42abdfc05ae723",
-                "reference": "8a275cfb7f061e87211ea8906e42abdfc05ae723",
+                "url": "https://api.github.com/repos/milux/spdo/zipball/134e91d88ef781ec86168adeef8362e50a2d011b",
+                "reference": "134e91d88ef781ec86168adeef8362e50a2d011b",
                 "shasum": ""
             },
             "require": {
@@ -68,8 +26,8 @@
             },
             "type": "library",
             "autoload": {
-                "psr-0": {
-                    "milux": "src"
+                "psr-4": {
+                    "milux\\": "src/milux"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -90,7 +48,7 @@
                 "pdo",
                 "sql"
             ],
-            "time": "2017-05-29 20:48:01"
+            "time": "2017-09-06 17:18:14"
         }
     ],
     "packages-dev": [],
