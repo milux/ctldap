@@ -39,7 +39,7 @@ if [ $ANSWER = "y" ]; then
     PRNG_CMD="tr -cd '[:alnum:]' < /dev/urandom | fold -w20 | head -n1"
     cat ctldap.example.config | \
     sed "s/ldap_password=XXXXXXXXXXXXXXXXXXXX/ldap_password=$(eval ${PRNG_CMD})/" | \
-    sed "s/api_key=XXXXXXXXXXXXXXXXXXXX/api_key=$(eval ${PRNG_CMD})/" > test.config
+    sed "s/api_key=XXXXXXXXXXXXXXXXXXXX/api_key=$(eval ${PRNG_CMD})/" > ctldap.config
 fi
 
 echo "Trying to open ctldap.config now, modify it according to your needs!"
