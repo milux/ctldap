@@ -124,7 +124,7 @@ function requestUsers (req, res, next) {
             mail: v.email,
             objectclass: ['CTPerson'],
             memberof: (results.userGroups[v.id] || []).map(function (cn) {
-              return fnGroupDn({ cn: cn });
+              return compatTransform(fnGroupDn({ cn: cn }));
             })
           }
         };
@@ -175,7 +175,7 @@ function requestGroups (req, res, next) {
             nsuniqueid: "g" + v.id,
             objectclass: ["group", "CTGroup" + groupType.charAt(0).toUpperCase() + groupType.slice(1)],
             uniquemember: (results.groupMembers[v.id] || []).map(function (cn) {
-              return fnUserDn({ cn: cn });
+              return compatTransform(fnUserDn({ cn: cn }));
             })
           }
         };
