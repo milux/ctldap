@@ -6,7 +6,7 @@
 # Required-Stop:     $remote_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: ChurchTools 3.2 LDAP-Wrapper
+# Short-Description: ChurchTools LDAP-Wrapper v2.0
 # Description:       Init script for the ChurchTools LDAP Wrapper.
 ### END INIT INFO
 
@@ -32,7 +32,7 @@ start)
             sh $DIR/$0 stop
         fi
     fi
-    su -c "nohup node $CTLDAP/ctldap.js 2>>$CTLDAP/error.log >>$CTLDAP/output.log &" - ctldap
+    su -c "systemd-cat -t ctldap node $CTLDAP/ctldap.js &" - ctldap
     PID=$( ps axf | grep "node $CTLDAP/ctldap.js" | grep -v grep | awk '{print $1}' )
     if [ -z "$PID" ]; then
         echo "Fail"

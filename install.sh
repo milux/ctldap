@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ChurchTools 3.2 LDAP-Wrapper
+# ChurchTools LDAP-Wrapper 2.0
 # (c) 2017 Michael Lux <michi.lux@gmail.com>
 # License: GNU/GPL v3.0
 
@@ -24,22 +24,32 @@ echo "Now creating the \"ctldap\" user..."
 useradd ctldap
 echo ""
 
-echo "Init logging files..."
-touch output.log
-touch error.log
-chown ctldap:ctldap *.log
-echo ""
-
 ANSWER="y"
 if [ -f "ctldap.config" ]; then
     read -n1 -p "Reset configuration file? [y/n]" ANSWER
     echo ""
 fi
 if [ $ANSWER = "y" ]; then
-    PRNG_CMD="tr -cd '[:alnum:]' < /dev/urandom | fold -w20 | head -n1"
+    PRNG_PASSWORD=$(tr -cd '[:alnum:]' < /dev/urandom | fold -w20 | head -n1)
+    echo ""
+    echo "The new password for the LDAP root user is: $PRNG_PASSWORD"
+    echo ""
+    read -r -p "Please enter the domain (and directory) of your ChurchTools installation (example: mychurch.church.tools): " CTLOC
+    echo "Assumed (HTTPS) ChurchTools URL: https://$CTLOC/"
+    echo "If this is wrong, please fix it manually when the configuration file is opened for customization."
+    echo ""
+    read -r -p "Please enter ChurchTools username for authentication: " USERNAME
+    read -r -p "Please enter ChurchTools user password for authentication: " PASSWORD
     cat ctldap.example.config | \
-    sed "s/ldap_password=XXXXXXXXXXXXXXXXXXXX/ldap_password=$(eval ${PRNG_CMD})/" | \
-    sed "s/api_key=XXXXXXXXXXXXXXXXXXXX/api_key=$(eval ${PRNG_CMD})/" > ctldap.config
+    sed "s?mysite.church.tools?$CTLOC?" | \
+    sed "s/ldap_password=XXXXXXXXXXXXXXXXXXXX/ldap_password=$PRNG_PASSWORD/" | \
+    sed "s/api_user=XXXXXXXXXXXXXXXXXXXX/api_user=$USERNAME/" | \
+    sed "s/api_password=XXXXXXXXXXXXXXXXXXXX/api_password=$PASSWORD/" > ctldap.config
+    echo ""
+    echo "Don't forget to grant your ChurchTools API user this privileges:"
+    echo "- churchcore:administer persons (Required to access the user data)"
+    echo "- churchdb:view (Required for ChurchDB API access)"
+    echo ""
 fi
 
 echo "Trying to open ctldap.config now, modify it according to your needs!"
