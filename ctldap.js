@@ -1,5 +1,5 @@
-// ChurchTools 3.2 LDAP-Wrapper
-// This tool requires a node.js-Server
+// ChurchTools LDAP-Wrapper 2.0
+// This tool requires a node.js-Server and ChurchTools >= 3.25.0
 // (c) 2017 Michael Lux
 // License: GNU/GPL v3.0
 
@@ -20,6 +20,8 @@ if (config.debug) {
 var fnUserDn = ldapEsc.dn("cn=${cn},ou=users,o=" + config.ldap_base_dn);
 var fnGroupDn = ldapEsc.dn("cn=${cn},ou=groups,o=" + config.ldap_base_dn);
 var adminDn = fnUserDn({ cn: config.ldap_user });
+var cookieJar = rp.jar();
+var loginPromise = null;
 
 if (config.dn_lower_case) {
   var compatTransform = function (s) {
@@ -40,26 +42,65 @@ if (config.ldap_cert_filename && config.ldap_key_filename) {
 }
 
 if (typeof config.cache_lifetime !== 'number') {
-  config.cache_lifetime = 10000;
+  config.cache_lifetime = 10000;  // 10 seconds
 }
 if (config.ct_uri.slice(-1) !== "/") {
   config.ct_uri += "/";
 }
 
 /**
+ * Returns a promise for the login on the ChurchTools API.
+ * If a pending login promise already exists, it is returned right away.
+ */
+function apiLogin() {
+  if (loginPromise === null) {
+    loginPromise = rp({
+      "method": "POST",
+      "jar": cookieJar,
+      "uri": config.ct_uri + "?q=login/ajax",
+      "form": {
+        "func": "login", 
+        "email": config.api_user,
+        "password": config.api_password
+      },
+      "json": true
+    }).then(function (result) {
+      if (result.status !== "success") {
+        throw result.message;
+      }
+      // clear login promise
+      loginPromise = null;
+      // end gracefully
+      return null;
+    });
+  }
+  return loginPromise;
+}
+
+/**
  * Retrieves data from the PHP API via a POST call.
  * @param {function} func - The function to call in the API class
  * @param {object} [data] - The optional form data to pass along with the POST request
+ * @param {boolean} [triedLogin] - Is true if this is the second attempt after API login
  */
-function apiPost(func, data) {
+function apiPost(func, data, triedLogin) {
   return rp({
     "method": "POST",
-    "uri": config.ct_uri + "api.php/API/" + func,
-    "form": extend({ api_key: config.api_key }, data || {}),
+    "jar": cookieJar,
+    "uri": config.ct_uri + "?q=churchdb/ajax",
+    "form": extend({ "func": func }, data || {}),
     "json": true
   }).then(function (result) {
       if (result.status !== "success") {
-        throw result.status;
+        // If session has expired, get a login Promise and await login
+        if (result.message === "Session expired!" && !triedLogin) {
+          // Remember that we tried to login to prevent looping
+          return apiLogin().then(function () {
+            // Retry operation after login
+            return apiPost(func, data, true);
+          });
+        }
+        throw result.message;
       }
       return result.data;
   });
