@@ -66,7 +66,7 @@ function apiLogin() {
       "json": true
     }).then(function (result) {
       if (result.status !== "success") {
-        throw result.message;
+        throw new Error(result.data);;
       }
       // clear login promise
       loginPromise = null;
@@ -100,7 +100,7 @@ function apiPost(func, data, triedLogin) {
             return apiPost(func, data, true);
           });
         }
-        throw result.message;
+        throw new Error(result.data);
       }
       return result.data;
   });
@@ -372,6 +372,12 @@ server.search("o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers
 }, sendUsers, sendGroups, endSuccess);
 
 // Start LDAP server
-server.listen(parseInt(config.ldap_port), function() {
-  console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
-});
+apiLogin()
+  .then(function () {
+    server.listen(parseInt(config.ldap_port), function() {
+        console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
+    });
+  })
+  .catch(function (error) {
+    console.log("Error at login to ChurchTools: " + error);
+  });
