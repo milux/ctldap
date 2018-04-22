@@ -18,7 +18,7 @@ services:
   # remove the following service for production usage
   test:
     build: test
-    image: sscholl/ctldap-test
+    image: sscholl/ctldap:test
     restart: "no"
     networks:
       - ldap
