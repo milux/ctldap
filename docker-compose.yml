@@ -1,0 +1,31 @@
+version: "3"
+services:
+
+  ldap:
+    build: . # remove this line for production usage
+    image: sscholl/ctldap
+    restart: unless-stopped
+    networks:
+      - ldap
+    environment:
+      DEBUG: ${DEBUG}
+      LDAP_PW: ${LDAP_PW}
+      LDAP_BASE_DN: ${LDAP_BASE_DN}
+      CT_URI: ${CT_URI}
+      CT_USER: ${CT_USER}
+      CT_PW: ${CT_PW}
+
+  # remove the following service for production usage
+  test:
+    build: test
+    image: sscholl/ctldap-test
+    restart: "no"
+    networks:
+      - ldap
+    environment:
+      LDAP_PW: ${LDAP_PW}
+      LDAP_BASE_DN: ${LDAP_BASE_DN}
+
+networks:
+  ldap:
+    external: true
