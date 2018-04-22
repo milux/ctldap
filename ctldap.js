@@ -59,7 +59,7 @@ function apiLogin() {
       "jar": cookieJar,
       "uri": config.ct_uri + "?q=login/ajax",
       "form": {
-        "func": "login", 
+        "func": "login",
         "email": config.api_user,
         "password": config.api_password
       },
@@ -355,21 +355,50 @@ server.bind("ou=users,o=" + config.ldap_base_dn, function (req, res, next) {
 
 // Search implementation for user search
 server.search("ou=users,o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers, function (req, res, next) {
+  if (config.debug) {
+    console.log("[DEBUG] request for users");
+  }
   req.checkAll = req.scope !== "base";
   return next();
 }, sendUsers, endSuccess);
 
 // Search implementation for group search
 server.search("ou=groups,o=" + config.ldap_base_dn, searchLogging, authorize, requestGroups, function (req, res, next) {
+  if (config.debug) {
+    console.log("[DEBUG] request for groups");
+  }
   req.checkAll = req.scope !== "base";
   return next();
 }, sendGroups, endSuccess);
 
 // Search implementation for user and group search
 server.search("o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers, requestGroups, function (req, res, next) {
+  if (config.debug) {
+    console.log("[DEBUG] request for users and groups combined");
+  }
   req.checkAll = req.scope === "sub";
   return next();
 }, sendUsers, sendGroups, endSuccess);
+
+// Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
+server.search('', function(req, res, next) {
+  if (config.debug) {
+    console.log("[DEBUG] empty request, return directory information");
+  }
+  var obj = {
+          "attributes":{
+            "objectClass":["top", "OpenLDAProotDSE"],
+            "subschemaSubentry": ["cn=subschema"],
+            "namingContexts": "o=" + config.ldap_base_dn,
+	      },
+          "dn":"",
+  };
+
+  if (req.filter.matches(obj.attributes))
+  res.send(obj);
+
+  res.end();
+}, endSuccess);
 
 // Start LDAP server
 apiLogin()
