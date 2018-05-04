@@ -54,6 +54,9 @@ if (config.ct_uri.slice(-1) !== "/") {
  */
 function apiLogin() {
   if (loginPromise === null) {
+    if (config.debug) {
+      console.log("Performing API login...");
+    }
     loginPromise = rp({
       "method": "POST",
       "jar": cookieJar,
@@ -66,13 +69,26 @@ function apiLogin() {
       "json": true
     }).then(function (result) {
       if (result.status !== "success") {
-        throw result.message;
+        throw new Error(result.data);
+      }
+      if (config.debug) {
+        console.log("API login completed");
       }
       // clear login promise
       loginPromise = null;
       // end gracefully
       return null;
+    }).catch(function (error) {
+      if (config.debug) {
+        console.log("API login failed!");
+      }
+      // clear login promise
+      loginPromise = null;
+      // rethrow error
+      throw new Error(error);
     });
+  } else if (config.debug) {
+    console.log("Return pending login promise");
   }
   return loginPromise;
 }
@@ -91,18 +107,26 @@ function apiPost(func, data, triedLogin) {
     "form": extend({ "func": func }, data || {}),
     "json": true
   }).then(function (result) {
-      if (result.status !== "success") {
-        // If session has expired, get a login Promise and await login
-        if (result.message === "Session expired!" && !triedLogin) {
-          // Remember that we tried to login to prevent looping
-          return apiLogin().then(function () {
-            // Retry operation after login
-            return apiPost(func, data, true);
-          });
+    if (result.status !== "success") {
+      // If this was the first attempt, login and try again
+      if (!triedLogin) {
+        if (config.debug) {
+          console.log("Session invalid, login and retry...");
         }
-        throw result.message;
+        // Remember that we tried to login to prevent looping
+        return apiLogin().then(function () {
+          // Retry operation after login
+          if (config.debug) {
+            console.log("Retry request to API function " + func + " after login");
+          }
+          return apiPost(func, data, true);
+        });
       }
-      return result.data;
+      throw new Error(result);
+    }
+    return result.data;
+  }, function (error) {
+    console.log(new Error(error));
   });
 }
 
@@ -278,7 +302,8 @@ function sendUsers (req, res, next) {
     });
     return next();
   }).catch(function (error) {
-    console.log("Error while retrieving users: " + error);
+    console.log("Error while retrieving users: ");
+    console.log(new Error(error));
     return next();
   });
 }
@@ -302,7 +327,8 @@ function sendGroups (req, res, next) {
     });
     return next();
   }).catch(function (error) {
-    console.log("Error while retrieving groups: " + error);
+    console.log("Error while retrieving groups: ");
+    console.log(new Error(error));
     return next();
   });
 }
@@ -348,7 +374,8 @@ server.bind("ou=users,o=" + config.ldap_base_dn, function (req, res, next) {
     }
     return next();
   }).catch(function (error) {
-    console.log("Authentication error: " + error);
+    console.log("Authentication error: ");
+    console.log(new Error(error));
     return next(new ldap.InvalidCredentialsError());
   });
 }, endSuccess);
@@ -372,6 +399,11 @@ server.search("o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers
 }, sendUsers, sendGroups, endSuccess);
 
 // Start LDAP server
-server.listen(parseInt(config.ldap_port), function() {
-  console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
+apiLogin().then(function () {
+  server.listen(parseInt(config.ldap_port), function () {
+    console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
+  });
+}, function (error) {
+  console.log("Error at login to ChurchTools: ");
+  console.log(new Error(error));
 });
