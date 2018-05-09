@@ -54,25 +54,41 @@ if (config.ct_uri.slice(-1) !== "/") {
  */
 function apiLogin() {
   if (loginPromise === null) {
+    if (config.debug) {
+      console.log("Performing API login...");
+    }
     loginPromise = rp({
       "method": "POST",
       "jar": cookieJar,
       "uri": config.ct_uri + "?q=login/ajax",
       "form": {
-        "func": "login", 
+        "func": "login",
         "email": config.api_user,
         "password": config.api_password
       },
       "json": true
     }).then(function (result) {
       if (result.status !== "success") {
-        throw result.message;
+        throw new Error(result.data);
+      }
+      if (config.debug) {
+        console.log("API login completed");
       }
       // clear login promise
       loginPromise = null;
       // end gracefully
       return null;
+    }).catch(function (error) {
+      if (config.debug) {
+        console.log("API login failed!");
+      }
+      // clear login promise
+      loginPromise = null;
+      // rethrow error
+      throw new Error(error);
     });
+  } else if (config.debug) {
+    console.log("Return pending login promise");
   }
   return loginPromise;
 }
@@ -91,18 +107,27 @@ function apiPost(func, data, triedLogin) {
     "form": extend({ "func": func }, data || {}),
     "json": true
   }).then(function (result) {
-      if (result.status !== "success") {
-        // If session has expired, get a login Promise and await login
-        if (result.message === "Session expired!" && !triedLogin) {
-          // Remember that we tried to login to prevent looping
-          return apiLogin().then(function () {
-            // Retry operation after login
-            return apiPost(func, data, true);
-          });
+    if (result.status !== "success") {
+      // If this was the first attempt, login and try again
+      if (!triedLogin) {
+        if (config.debug) {
+          console.log("Session invalid, login and retry...");
         }
-        throw result.message;
+        return apiLogin().then(function () {
+          // Retry operation after login
+          if (config.debug) {
+            console.log("Retry request to API function " + func + " after login");
+          }
+          // Set "triedLogin" parameter to prevent looping
+          return apiPost(func, data, true);
+        });
+      } else {
+        throw new Error(result);
       }
-      return result.data;
+    }
+    return result.data;
+  }, function (error) {
+    console.log(new Error(error));
   });
 }
 
@@ -278,7 +303,8 @@ function sendUsers (req, res, next) {
     });
     return next();
   }).catch(function (error) {
-    console.log("Error while retrieving users: " + error);
+    console.log("Error while retrieving users: ");
+    console.log(new Error(error));
     return next();
   });
 }
@@ -302,7 +328,8 @@ function sendGroups (req, res, next) {
     });
     return next();
   }).catch(function (error) {
-    console.log("Error while retrieving groups: " + error);
+    console.log("Error while retrieving groups: ");
+    console.log(new Error(error));
     return next();
   });
 }
@@ -348,30 +375,65 @@ server.bind("ou=users,o=" + config.ldap_base_dn, function (req, res, next) {
     }
     return next();
   }).catch(function (error) {
-    console.log("Authentication error: " + error);
+    console.log("Authentication error: ");
+    console.log(new Error(error));
     return next(new ldap.InvalidCredentialsError());
   });
 }, endSuccess);
 
 // Search implementation for user search
 server.search("ou=users,o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers, function (req, res, next) {
+  if (config.debug) {
+    console.log("[DEBUG] request for users");
+  }
   req.checkAll = req.scope !== "base";
   return next();
 }, sendUsers, endSuccess);
 
 // Search implementation for group search
 server.search("ou=groups,o=" + config.ldap_base_dn, searchLogging, authorize, requestGroups, function (req, res, next) {
+  if (config.debug) {
+    console.log("[DEBUG] request for groups");
+  }
   req.checkAll = req.scope !== "base";
   return next();
 }, sendGroups, endSuccess);
 
 // Search implementation for user and group search
 server.search("o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers, requestGroups, function (req, res, next) {
+  if (config.debug) {
+    console.log("[DEBUG] request for users and groups combined");
+  }
   req.checkAll = req.scope === "sub";
   return next();
 }, sendUsers, sendGroups, endSuccess);
 
+// Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
+server.search('', function(req, res, next) {
+  if (config.debug) {
+    console.log("[DEBUG] empty request, return directory information");
+  }
+  var obj = {
+          "attributes":{
+            "objectClass":["top", "OpenLDAProotDSE"],
+            "subschemaSubentry": ["cn=subschema"],
+            "namingContexts": "o=" + config.ldap_base_dn,
+	      },
+          "dn":"",
+  };
+
+  if (req.filter.matches(obj.attributes))
+  res.send(obj);
+
+  res.end();
+}, endSuccess);
+
 // Start LDAP server
-server.listen(parseInt(config.ldap_port), function() {
-  console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
+apiLogin().then(function () {
+  server.listen(parseInt(config.ldap_port), function () {
+    console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
+  });
+}, function (error) {
+  console.log("Error at login to ChurchTools: ");
+  console.log(new Error(error));
 });

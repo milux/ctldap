@@ -1,0 +1,37 @@
+version: "3"
+services:
+
+  ldap:
+    build: . # remove this line for production usage
+    image: milux/ctldap:latest
+    restart: unless-stopped
+    networks:
+      - ldap
+    environment:
+      - DEBUG
+      - IS_DN_LOWER_CASE
+      - LDAP_USER
+      - LDAP_PW
+      - LDAP_PORT
+      - LDAP_BASE_DN
+      - CT_URI
+      - CT_USER
+      - CT_PW
+      - CACHE_LIVETIME
+
+  # remove the following service for production usage
+  test:
+    build: test
+    image: milux/ctldap:test
+    restart: "no"
+    networks:
+      - ldap
+    environment:
+      - LDAP_USER
+      - LDAP_PW
+      - LDAP_PORT
+      - LDAP_BASE_DN
+
+networks:
+  ldap:
+    external: true
