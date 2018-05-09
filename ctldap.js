@@ -113,16 +113,17 @@ function apiPost(func, data, triedLogin) {
         if (config.debug) {
           console.log("Session invalid, login and retry...");
         }
-        // Remember that we tried to login to prevent looping
         return apiLogin().then(function () {
           // Retry operation after login
           if (config.debug) {
             console.log("Retry request to API function " + func + " after login");
           }
+          // Set "triedLogin" parameter to prevent looping
           return apiPost(func, data, true);
         });
+      } else {
+        throw new Error(result);
       }
-      throw new Error(result);
     }
     return result.data;
   }, function (error) {
