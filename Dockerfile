@@ -1,5 +1,5 @@
 FROM node:alpine
-MAINTAINER Simon Scholl <s@sdscholl.de>
+LABEL maintainer="Simon Scholl <s@sdscholl.de>"
 
 RUN mkdir /app && chown node:node /app
 USER node
