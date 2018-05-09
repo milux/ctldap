@@ -3,28 +3,34 @@ services:
 
   ldap:
     build: . # remove this line for production usage
-    image: sscholl/ctldap
+    image: milux/ctldap:latest
     restart: unless-stopped
     networks:
       - ldap
     environment:
-      DEBUG: ${DEBUG}
-      LDAP_PW: ${LDAP_PW}
-      LDAP_BASE_DN: ${LDAP_BASE_DN}
-      CT_URI: ${CT_URI}
-      CT_USER: ${CT_USER}
-      CT_PW: ${CT_PW}
+      - DEBUG
+      - IS_DN_LOWER_CASE
+      - LDAP_USER
+      - LDAP_PW
+      - LDAP_PORT
+      - LDAP_BASE_DN
+      - CT_URI
+      - CT_USER
+      - CT_PW
+      - CACHE_LIVETIME
 
   # remove the following service for production usage
   test:
     build: test
-    image: sscholl/ctldap:test
+    image: milux/ctldap:test
     restart: "no"
     networks:
       - ldap
     environment:
-      LDAP_PW: ${LDAP_PW}
-      LDAP_BASE_DN: ${LDAP_BASE_DN}
+      - LDAP_USER
+      - LDAP_PW
+      - LDAP_PORT
+      - LDAP_BASE_DN
 
 networks:
   ldap:

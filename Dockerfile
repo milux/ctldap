@@ -35,4 +35,3 @@ CMD cp ctldap.example.config ctldap.config && \
     sed -i "s/^\(api_password\s*=\s*\).*\$/\1$CT_PW/" ctldap.config && \
     sed -i "s/^\(cache_lifetime\s*=\s*\).*\$/\1$CACHE_LIVETIME/" ctldap.config && \
     node ctldap.js
-
