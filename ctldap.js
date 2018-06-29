@@ -15,23 +15,43 @@ var path = require('path');
 var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
 if (config.debug) {
   console.log("Debug mode enabled, expect lots of output!");
+  console.dir(config);
 }
 
-var fnUserDn = ldapEsc.dn("cn=${cn},ou=users,o=" + config.ldap_base_dn);
-var fnGroupDn = ldapEsc.dn("cn=${cn},ou=groups,o=" + config.ldap_base_dn);
-var adminDn = fnUserDn({ cn: config.ldap_user });
-var cookieJar = rp.jar();
-var loginPromise = null;
-
-if (config.dn_lower_case) {
-  var compatTransform = function (s) {
-    return s.toLowerCase();
+if (config.ldap_base_dn) {
+  if (!config.sites) {
+    config.sites = {};
   }
-} else {
-  var compatTransform = function (s) {
-    return s;
+  config.sites[config.ldap_base_dn] = {
+    ldap_password: config.ldap_password,
+    ct_uri: config.ct_uri,
+    api_user: config.api_user,
+    api_password: config.api_password
   }
 }
+
+Object.keys(config.sites).map(function(sitename, index) {
+  var site = config.sites[sitename];
+
+  site.fnUserDn = ldapEsc.dn("cn=${cn},ou=users,o=" + sitename);
+  site.fnGroupDn = ldapEsc.dn("cn=${cn},ou=groups,o=" + sitename);
+  site.cookieJar = rp.jar();
+  site.loginPromise = null;
+  site.adminDn = site.fnUserDn({cn: config.ldap_user});
+
+  if (site.dn_lower_case || ((site.dn_lower_case === undefined) && config.dn_lower_case)) {
+    site.compatTransform = function (s) {
+      return s.toLowerCase();
+    }
+  } else {
+    site.compatTransform = function (s) {
+      return s;
+    }
+  }
+  if (site.ct_uri.slice(-1) !== "/") {
+    site.ct_uri += "/";
+  }
+});
 
 if (config.ldap_cert_filename && config.ldap_key_filename) {
   var ldapCert = fs.readFileSync(config.ldap_cert_filename, {encoding: "utf8"}),
@@ -44,27 +64,24 @@ if (config.ldap_cert_filename && config.ldap_key_filename) {
 if (typeof config.cache_lifetime !== 'number') {
   config.cache_lifetime = 10000;  // 10 seconds
 }
-if (config.ct_uri.slice(-1) !== "/") {
-  config.ct_uri += "/";
-}
 
 /**
  * Returns a promise for the login on the ChurchTools API.
  * If a pending login promise already exists, it is returned right away.
  */
-function apiLogin() {
-  if (loginPromise === null) {
+function apiLogin(site) {
+  if (site.loginPromise === null) {
     if (config.debug) {
       console.log("Performing API login...");
     }
-    loginPromise = rp({
+    site.loginPromise = rp({
       "method": "POST",
-      "jar": cookieJar,
-      "uri": config.ct_uri + "?q=login/ajax",
+      "jar": site.cookieJar,
+      "uri": site.ct_uri + "?q=login/ajax",
       "form": {
         "func": "login",
-        "email": config.api_user,
-        "password": config.api_password
+        "email": site.api_user,
+        "password": site.api_password
       },
       "json": true
     }).then(function (result) {
@@ -75,7 +92,7 @@ function apiLogin() {
         console.log("API login completed");
       }
       // clear login promise
-      loginPromise = null;
+      site.loginPromise = null;
       // end gracefully
       return null;
     }).catch(function (error) {
@@ -83,14 +100,14 @@ function apiLogin() {
         console.log("API login failed!");
       }
       // clear login promise
-      loginPromise = null;
+      site.loginPromise = null;
       // rethrow error
       throw new Error(error);
     });
   } else if (config.debug) {
     console.log("Return pending login promise");
   }
-  return loginPromise;
+  return site.loginPromise;
 }
 
 /**
@@ -99,11 +116,11 @@ function apiLogin() {
  * @param {object} [data] - The optional form data to pass along with the POST request
  * @param {boolean} [triedLogin] - Is true if this is the second attempt after API login
  */
-function apiPost(func, data, triedLogin) {
+function apiPost(site, func, data, triedLogin) {
   return rp({
     "method": "POST",
-    "jar": cookieJar,
-    "uri": config.ct_uri + "?q=churchdb/ajax",
+    "jar": site.cookieJar,
+    "uri": site.ct_uri + "?q=churchdb/ajax",
     "form": extend({ "func": func }, data || {}),
     "json": true
   }).then(function (result) {
@@ -113,13 +130,13 @@ function apiPost(func, data, triedLogin) {
         if (config.debug) {
           console.log("Session invalid, login and retry...");
         }
-        return apiLogin().then(function () {
+        return apiLogin(site).then(function () {
           // Retry operation after login
           if (config.debug) {
             console.log("Retry request to API function " + func + " after login");
           }
           // Set "triedLogin" parameter to prevent looping
-          return apiPost(func, data, true);
+          return apiPost(site, func, data, true);
         });
       } else {
         throw new Error(result);
@@ -167,12 +184,13 @@ function getCached(key, maxAge, factory) {
  * @param {function} next - Next handler function of filter chain
  */
 function requestUsers (req, res, next) {
+  var site = req.site;
   req.usersPromise = getCached(USERS_KEY, config.cache_lifetime, function () {
-    return apiPost("getUsersData").then(function (results) {
+    return apiPost(site, "getUsersData").then(function (results) {
       var newCache = results.users.map(function (v) {
         var cn = v.cmsuserid;
         return {
-          dn: compatTransform(fnUserDn({ cn: cn })),
+          dn: site.compatTransform(site.fnUserDn({ cn: cn })),
           attributes: {
             cn: cn,
             displayname: v.vorname + " " + v.name,
@@ -190,16 +208,16 @@ function requestUsers (req, res, next) {
             mail: v.email,
             objectclass: ['CTPerson'],
             memberof: (results.userGroups[v.id] || []).map(function (cn) {
-              return compatTransform(fnGroupDn({ cn: cn }));
+              return site.compatTransform(site.fnGroupDn({ cn: cn }));
             })
           }
         };
       });
       // Virtual admin user
-      if (config.ldap_password !== undefined) {
+      if (site.ldap_password !== undefined) {
         var cn = config.ldap_user;
         newCache.push({
-          dn: compatTransform(fnUserDn({ cn: cn })),
+          dn: site.compatTransform(site.fnUserDn({ cn: cn })),
           attributes: {
             cn: cn,
             displayname: "LDAP Administrator",
@@ -227,13 +245,14 @@ function requestUsers (req, res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function requestGroups (req, res, next) {
+  var site = req.site;
   req.groupsPromise = getCached(GROUPS_KEY, config.cache_lifetime, function () {
-    return apiPost("getGroupsData").then(function (results) {
+    return apiPost(site, "getGroupsData").then(function (results) {
       var newCache = results.groups.map(function (v) {
         var cn = v.bezeichnung;
         var groupType = v.gruppentyp;
         return {
-          dn: compatTransform(fnGroupDn({ cn: cn })),
+          dn: site.compatTransform(site.fnGroupDn({ cn: cn })),
           attributes: {
             cn: cn,
             displayname: v.bezeichnung,
@@ -241,7 +260,7 @@ function requestGroups (req, res, next) {
             nsuniqueid: "g" + v.id,
             objectclass: ["group", "CTGroup" + groupType.charAt(0).toUpperCase() + groupType.slice(1)],
             uniquemember: (results.groupMembers[v.id] || []).map(function (cn) {
-              return compatTransform(fnUserDn({ cn: cn }));
+              return site.compatTransform(site.fnUserDn({ cn: cn }));
             })
           }
         };
@@ -263,7 +282,7 @@ function requestGroups (req, res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function authorize(req, res, next) {
-  if (!req.connection.ldap.bindDN.equals(adminDn)) {
+  if (!req.connection.ldap.bindDN.equals(req.site.adminDn)) {
     console.log("Rejected search without proper binding!");
     return next(new ldap.InsufficientAccessRightsError());
   }
@@ -345,15 +364,21 @@ function endSuccess (req, res, next) {
   return next();
 }
 
-// Login bind for user
-server.bind("ou=users,o=" + config.ldap_base_dn, function (req, res, next) {
-  if (req.dn.equals(adminDn)) {
+/**
+ * Checks the given credentials agains the credentials in the config file or against a ChurchTools server.
+ * @param {object} req - Request object
+ * @param {object} res - Response object
+ * @param {function} next - Next handler function of filter chain
+ */
+function authenticate (req, res, next) {
+  var site = req.site;
+  if (req.dn.equals(site.adminDn)) {
     if (config.debug)  {
       console.log('Admin bind DN: ' + req.dn.toString());
     }
     // If ldap_password is undefined, try a default ChurchTools authentication with this user
-    if (config.ldap_password !== undefined) {
-      if (req.credentials === config.ldap_password) {
+    if (site.ldap_password !== undefined) {
+      if (req.credentials === site.ldap_password) {
         if (config.debug) {
           console.log("Authentication success");
         }
@@ -366,7 +391,7 @@ server.bind("ou=users,o=" + config.ldap_base_dn, function (req, res, next) {
   } else if (config.debug) {
     console.log('Bind user DN: ' + req.dn.toString());
   }
-  apiPost("authenticate", {
+  apiPost(site, "authenticate", {
     "user": req.dn.rdns[0].cn,
     "password": req.credentials
   }).then(function () {
@@ -379,61 +404,74 @@ server.bind("ou=users,o=" + config.ldap_base_dn, function (req, res, next) {
     console.log(new Error(error));
     return next(new ldap.InvalidCredentialsError());
   });
-}, endSuccess);
+}
 
-// Search implementation for user search
-server.search("ou=users,o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers, function (req, res, next) {
-  if (config.debug) {
-    console.log("[DEBUG] request for users");
-  }
-  req.checkAll = req.scope !== "base";
-  return next();
-}, sendUsers, endSuccess);
+Object.keys(config.sites).map(function(sitename, index) {
+  // Login bind for user
+  server.bind("ou=users,o=" + sitename, function (req, res, next) {
+    req.site = config.sites[sitename];
+    next();
+  }, authenticate, endSuccess);
 
-// Search implementation for group search
-server.search("ou=groups,o=" + config.ldap_base_dn, searchLogging, authorize, requestGroups, function (req, res, next) {
-  if (config.debug) {
-    console.log("[DEBUG] request for groups");
-  }
-  req.checkAll = req.scope !== "base";
-  return next();
-}, sendGroups, endSuccess);
+  // Search implementation for user search
+  server.search("ou=users,o=" + sitename, function (req, res, next) {
+    req.site = config.sites[sitename];
+    next();
+  }, searchLogging, authorize, requestUsers, function (req, res, next) {
+    if (config.debug) {
+      console.log("[DEBUG] request for users");
+    }
+    req.checkAll = req.scope !== "base";
+    return next();
+  }, sendUsers, endSuccess);
 
-// Search implementation for user and group search
-server.search("o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers, requestGroups, function (req, res, next) {
-  if (config.debug) {
-    console.log("[DEBUG] request for users and groups combined");
-  }
-  req.checkAll = req.scope === "sub";
-  return next();
-}, sendUsers, sendGroups, endSuccess);
+  // Search implementation for group search
+  server.search("ou=groups,o=" + sitename, function (req, res, next) {
+    req.site = config.sites[sitename];
+    next();
+  }, searchLogging, authorize, requestGroups, function (req, res, next) {
+    if (config.debug) {
+      console.log("[DEBUG] request for groups");
+    }
+    req.checkAll = req.scope !== "base";
+    return next();
+  }, sendGroups, endSuccess);
+
+  // Search implementation for user and group search
+  server.search("o=" + sitename, function (req, res, next) {
+    req.site = config.sites[sitename];
+    next();
+  }, searchLogging, authorize, requestUsers, requestGroups, function (req, res, next) {
+    if (config.debug) {
+      console.log("[DEBUG] request for users and groups combined");
+    }
+    req.checkAll = req.scope === "sub";
+    return next();
+  }, sendUsers, sendGroups, endSuccess);
+
+});
 
 // Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
-server.search('', function(req, res, next) {
+server.search('', function (req, res, next) {
   if (config.debug) {
     console.log("[DEBUG] empty request, return directory information");
   }
   var obj = {
-          "attributes":{
-            "objectClass":["top", "OpenLDAProotDSE"],
-            "subschemaSubentry": ["cn=subschema"],
-            "namingContexts": "o=" + config.ldap_base_dn,
-	      },
-          "dn":"",
+    "attributes": {
+      "objectClass": ["top", "OpenLDAProotDSE"],
+      "subschemaSubentry": ["cn=subschema"],
+      "namingContexts": "o=" + req.dn.o,
+    },
+    "dn": "",
   };
 
   if (req.filter.matches(obj.attributes))
-  res.send(obj);
+    res.send(obj);
 
   res.end();
 }, endSuccess);
 
 // Start LDAP server
-apiLogin().then(function () {
-  server.listen(parseInt(config.ldap_port), function () {
-    console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
-  });
-}, function (error) {
-  console.log("Error at login to ChurchTools: ");
-  console.log(new Error(error));
+server.listen(parseInt(config.ldap_port), function () {
+  console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
 });
