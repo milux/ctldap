@@ -20,12 +20,17 @@ var apiPassword = process.argv[7];
 var config = ini.parse(fs.readFileSync('./ctldap.config', 'utf-8'))
 
 if (command === 'show') {
-  console.dir(config.sites[sitename]);
+  if (config.sites[sitename]) {
+    console.log('Site: ' + sitename);
+    console.log('URI: ' + config.sites[sitename].ct_uri);
+    console.log('LDAP root passsword: ' + config.sites[sitename].ldap_password);
+  }
   return;
 }
 
 if (command === 'remove') {
   delete config.sites[sitename];
+  console.log('Deleting config for site '+sitename+' ...');
 }
 
 if (command === 'add') {
@@ -35,6 +40,7 @@ if (command === 'add') {
     api_user: apiUser,
     api_password: apiPassword
   }
+  console.log('Adding config for site '+sitename+' ...');
 }
 
 
