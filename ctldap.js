@@ -15,7 +15,6 @@ var path = require('path');
 var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
 if (config.debug) {
   console.log("Debug mode enabled, expect lots of output!");
-  console.dir(config);
 }
 
 if (config.ldap_base_dn) {
@@ -45,6 +44,15 @@ Object.keys(config.sites).map(function(sitename, index) {
     }
   } else {
     site.compatTransform = function (s) {
+      return s;
+    }
+  }
+  if (site.email_lower_case || ((site.email_lower_case === undefined) && config.email_lower_case)) {
+    site.compatTransformEmail = function (s) {
+      return s ? s.toLowerCase() : s;
+    }
+  } else {
+    site.compatTransformEmail = function (s) {
       return s;
     }
   }
@@ -204,8 +212,8 @@ function requestUsers (req, res, next) {
             postalCode: v.plz,
             l: v.ort,
             sn: v.name,
-            email: v.email,
-            mail: v.email,
+            email: site.compatTransformEmail(v.email),
+            mail: site.compatTransformEmail(v.email),
             objectclass: ['CTPerson'],
             memberof: (results.userGroups[v.id] || []).map(function (cn) {
               return site.compatTransform(site.fnGroupDn({ cn: cn }));
