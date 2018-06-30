@@ -1,5 +1,5 @@
 var fs = require('fs')
-  , ini = require('ini')
+  , ini = require('ini');
 
 if ((process.argv.length < 3) || ((process.argv[2] === 'add') && (process.argv.length < 8))) {
   console.log('Usage:');
@@ -17,13 +17,15 @@ var apiUser = process.argv[6];
 var apiPassword = process.argv[7];
 
 
-var config = ini.parse(fs.readFileSync('./ctldap.config', 'utf-8'))
+var config = ini.parse(fs.readFileSync('./ctldap.config', 'utf-8'));
 
 if (command === 'show') {
   if (config.sites[sitename]) {
     console.log('Site: ' + sitename);
     console.log('URI: ' + config.sites[sitename].ct_uri);
     console.log('LDAP root passsword: ' + config.sites[sitename].ldap_password);
+  } else {
+    console.log('No LDAP config for site '+sitename+' .');
   }
   return;
 }
@@ -39,7 +41,7 @@ if (command === 'add') {
     ct_uri: uri,
     api_user: apiUser,
     api_password: apiPassword
-  }
+  };
   console.log('Adding config for site '+sitename+' ...');
 }
 
