@@ -42,6 +42,11 @@ if (command === 'add') {
     api_user: apiUser,
     api_password: apiPassword
   };
+  if (password.substr(0, 4) === '$2y$') {
+    config.sites[sitename].ldap_password_bcrypt = true;
+  } else {
+    delete config.sites[sitename].ldap_password_bcrypt;
+  }
   console.log('Adding config for site '+sitename+' ...');
 }
 
