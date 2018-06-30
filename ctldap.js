@@ -11,6 +11,7 @@ var ldapEsc = require('ldap-escape');
 var extend = require('extend');
 var Promise = require("bluebird");
 var path = require('path');
+var bcrypt = require('bcrypt');
 
 var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
 if (config.debug) {
@@ -37,6 +38,7 @@ Object.keys(config.sites).map(function(sitename, index) {
   site.cookieJar = rp.jar();
   site.loginPromise = null;
   site.adminDn = site.fnUserDn({cn: config.ldap_user});
+  site.CACHE = {};
 
   if (site.dn_lower_case || ((site.dn_lower_case === undefined) && config.dn_lower_case)) {
     site.compatTransform = function (s) {
@@ -54,6 +56,18 @@ Object.keys(config.sites).map(function(sitename, index) {
   } else {
     site.compatTransformEmail = function (s) {
       return s;
+    }
+  }
+  if (site.ldap_password_bcrypt || ((site.ldap_password_bcrypt === undefined) && config.ldap_password_bcrypt)) {
+    site.checkPassword = function (password, callback) {
+      var hash = site.ldap_password.replace(/^\$2y(.+)$/i, '$2a$1');
+      bcrypt.compare(password, hash, function(err, res) {
+        callback(res);
+      });
+    }
+  } else {
+    site.checkPassword = function (password, callback) {
+      callback(password === site.ldap_password);
     }
   }
   if (site.ct_uri.slice(-1) !== "/") {
@@ -120,6 +134,7 @@ function apiLogin(site) {
 
 /**
  * Retrieves data from the PHP API via a POST call.
+ * @param {object} site - The current site
  * @param {function} func - The function to call in the API class
  * @param {object} [data] - The optional form data to pass along with the POST request
  * @param {boolean} [triedLogin] - Is true if this is the second attempt after API login
@@ -156,7 +171,6 @@ function apiPost(site, func, data, triedLogin) {
   });
 }
 
-var CACHE = {};
 var USERS_KEY = "users", GROUPS_KEY = "groups";
 
 /**
@@ -165,10 +179,10 @@ var USERS_KEY = "users", GROUPS_KEY = "groups";
  * @param {number} maxAge - The maximum age of the cache entry, if older the data will be refreshed
  * @param {function} factory - A function returning a Promise that resolves with the new cache entry or rejects
  */
-function getCached(key, maxAge, factory) {
+function getCached(site, key, maxAge, factory) {
   return new Promise(function (resolve, reject) {
     var time = new Date().getTime();
-    var co = CACHE[key] || { time: -1, entry: null };
+    var co = site.CACHE[key] || { time: -1, entry: null };
     if (time - maxAge < co.time) {
       resolve(co.entry);
     } else {
@@ -177,7 +191,7 @@ function getCached(key, maxAge, factory) {
       factory().then(function (result) {
         co.entry = result;
         co.time = new Date().getTime();
-        CACHE[key] = co;
+        site.CACHE[key] = co;
         resolve(result);
       }, reject);
     }
@@ -193,7 +207,7 @@ function getCached(key, maxAge, factory) {
  */
 function requestUsers (req, res, next) {
   var site = req.site;
-  req.usersPromise = getCached(USERS_KEY, config.cache_lifetime, function () {
+  req.usersPromise = getCached(site, USERS_KEY, config.cache_lifetime, function () {
     return apiPost(site, "getUsersData").then(function (results) {
       var newCache = results.users.map(function (v) {
         var cn = v.cmsuserid;
@@ -254,7 +268,7 @@ function requestUsers (req, res, next) {
  */
 function requestGroups (req, res, next) {
   var site = req.site;
-  req.groupsPromise = getCached(GROUPS_KEY, config.cache_lifetime, function () {
+  req.groupsPromise = getCached(site, GROUPS_KEY, config.cache_lifetime, function () {
     return apiPost(site, "getGroupsData").then(function (results) {
       var newCache = results.groups.map(function (v) {
         var cn = v.bezeichnung;
@@ -386,15 +400,18 @@ function authenticate (req, res, next) {
     }
     // If ldap_password is undefined, try a default ChurchTools authentication with this user
     if (site.ldap_password !== undefined) {
-      if (req.credentials === site.ldap_password) {
-        if (config.debug) {
-          console.log("Authentication success");
+      site.checkPassword(req.credentials, function (result) {
+        if (result) {
+          if (config.debug) {
+            console.log("Authentication success");
+          }
+          return next();
+        } else {
+          console.log("Invalid root password!");
+          return next(new ldap.InvalidCredentialsError());
         }
-        return next();
-      } else {
-        console.log("Invalid root password!");
-        return next(new ldap.InvalidCredentialsError());
-      }
+      });
+      return;
     }
   } else if (config.debug) {
     console.log('Bind user DN: ' + req.dn.toString());
