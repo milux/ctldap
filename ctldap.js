@@ -167,7 +167,7 @@ function apiPost(site, func, data, triedLogin) {
     }
     return result.data;
   }, function (error) {
-    console.log(error);
+    console.log(error.message);
   });
 }
 
@@ -345,7 +345,7 @@ function sendUsers (req, res, next) {
     return next();
   }).catch(function (error) {
     console.log("Error while retrieving users: ");
-    console.log(error);
+    console.log(error.message);
     return next();
   });
 }
@@ -370,7 +370,7 @@ function sendGroups (req, res, next) {
     return next();
   }).catch(function (error) {
     console.log("Error while retrieving groups: ");
-    console.log(error);
+    console.log(error.message);
     return next();
   });
 }
@@ -426,7 +426,7 @@ function authenticate (req, res, next) {
     return next();
   }).catch(function (error) {
     console.log("Authentication error: ");
-    console.log(error);
+    console.log(error.message);
     return next(new ldap.InvalidCredentialsError());
   });
 }
