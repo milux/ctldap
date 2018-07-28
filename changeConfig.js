@@ -1,11 +1,12 @@
 var fs = require('fs')
   , ini = require('ini');
 
-if ((process.argv.length < 3) || ((process.argv[2] === 'add') && (process.argv.length < 8))) {
+if ((process.argv.length < 3) || (process.argv[2] === 'list') || ((process.argv[2] === 'add') && (process.argv.length < 8))) {
   console.log('Usage:');
   console.log('  node changeConfig.js add <sitename> <uri> <password> <api-user> <api-password> [<comment>]');
   console.log('  node changeConfig.js remove <sitename>');
   console.log('  node changeConfig.js show <sitename>');
+  console.log('  node changeConfig.js list');
   return;
 }
 
@@ -33,6 +34,14 @@ if (command === 'show') {
   }
   return;
 }
+
+if (command === 'list') {
+  console.log('Configured LDAP sites:');
+  Object.keys(config.sites).forEach(function (key) {
+    console.log(key);
+  });
+}
+
 
 if (command === 'remove') {
   delete config.sites[sitename];
