@@ -384,7 +384,7 @@ server.bind("ou=users,o=" + config.ldap_base_dn, function (req, res, next) {
 // Search implementation for user search
 server.search("ou=users,o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers, function (req, res, next) {
   if (config.debug) {
-    console.log("[DEBUG] request for users");
+    console.log("[DEBUG] request for users " + req);
   }
   req.checkAll = req.scope !== "base";
   return next();
@@ -393,7 +393,7 @@ server.search("ou=users,o=" + config.ldap_base_dn, searchLogging, authorize, req
 // Search implementation for group search
 server.search("ou=groups,o=" + config.ldap_base_dn, searchLogging, authorize, requestGroups, function (req, res, next) {
   if (config.debug) {
-    console.log("[DEBUG] request for groups");
+    console.log("[DEBUG] request for groups " + req);
   }
   req.checkAll = req.scope !== "base";
   return next();
@@ -402,7 +402,7 @@ server.search("ou=groups,o=" + config.ldap_base_dn, searchLogging, authorize, re
 // Search implementation for user and group search
 server.search("o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers, requestGroups, function (req, res, next) {
   if (config.debug) {
-    console.log("[DEBUG] request for users and groups combined");
+    console.log("[DEBUG] request for users and groups combined " + req);
   }
   req.checkAll = req.scope === "sub";
   return next();
@@ -411,7 +411,7 @@ server.search("o=" + config.ldap_base_dn, searchLogging, authorize, requestUsers
 // Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
 server.search('', function(req, res, next) {
   if (config.debug) {
-    console.log("[DEBUG] empty request, return directory information");
+    console.log("[DEBUG] empty request, return directory information " + req);
   }
   var obj = {
           "attributes":{

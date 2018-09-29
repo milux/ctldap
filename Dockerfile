@@ -5,8 +5,10 @@ RUN mkdir /app && chown node:node /app
 USER node
 WORKDIR /app
 
-COPY . .
+# copy package.json first to use docker layer cache
+COPY package.json .
 RUN npm install
+COPY . .
 
 EXPOSE 1389
 
