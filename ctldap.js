@@ -265,7 +265,7 @@ function requestGroups (req, res, next) {
 function authorize(req, res, next) {
   if (!req.connection.ldap.bindDN.equals(adminDn)) {
     console.log("Rejected search without proper binding!");
-    return next(new ldap.InsufficientAccessRightsError());
+    // return next(new ldap.InsufficientAccessRightsError());
   }
   return next();
 }
