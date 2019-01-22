@@ -39,6 +39,8 @@ Object.keys(config.sites).map(function(sitename, index) {
   site.loginPromise = null;
   site.adminDn = site.fnUserDn({cn: config.ldap_user});
   site.CACHE = {};
+  site.loginErrorCount = 0;
+  site.loginBlockedDate = null;
 
   if (site.dn_lower_case || ((site.dn_lower_case === undefined) && config.dn_lower_case)) {
     site.compatTransform = function (s) {
@@ -60,14 +62,49 @@ Object.keys(config.sites).map(function(sitename, index) {
   }
   if (site.ldap_password_bcrypt || ((site.ldap_password_bcrypt === undefined) && config.ldap_password_bcrypt)) {
     site.checkPassword = function (password, callback) {
+      if (site.loginBlockedDate) {
+        var now = new Date();
+        var checkDate = new Date(site.loginBlockedDate.getTime() + 1000*3600*24); // one day
+        if (now < checkDate) {
+          callback(false);
+          return;
+        } else {
+          site.loginBlockedDate = null;
+          site.loginErrorCount = 0;
+        }
+      }
       var hash = site.ldap_password.replace(/^\$2y(.+)$/i, '$2a$1');
-      bcrypt.compare(password, hash, function(err, res) {
-        callback(res);
+      bcrypt.compare(password, hash, function(err, valid) {
+        if (!valid) {
+          site.loginErrorCount += 1;
+          if (site.loginErrorCount > 5) {
+            site.loginBlockedDate = new Date();
+          }
+        }
+        callback(valid);
       });
     }
   } else {
     site.checkPassword = function (password, callback) {
-      callback(password === site.ldap_password);
+      if (site.loginBlockedDate) {
+        var now = new Date();
+        var checkDate = new Date(site.loginBlockedDate.getTime() + 1000*3600*24); // one day
+        if (now < checkDate) {
+          callback(false);
+          return;
+        } else {
+          site.loginBlockedDate = null;
+          site.loginErrorCount = 0;
+        }
+      }
+      var valid = (password === site.ldap_password);
+      if (!valid) {
+        site.loginErrorCount += 1;
+        if (site.loginErrorCount > 5) {
+          site.loginBlockedDate = new Date();
+        }
+      }
+      callback(valid);
     }
   }
   if (site.ct_uri.slice(-1) !== "/") {
@@ -387,7 +424,7 @@ function endSuccess (req, res, next) {
 }
 
 /**
- * Checks the given credentials agains the credentials in the config file or against a ChurchTools server.
+ * Checks the given credentials against the credentials in the config file or against a ChurchTools server.
  * @param {object} req - Request object
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
