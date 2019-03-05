@@ -363,7 +363,7 @@ function searchLogging (req, res, next) {
 }
 
 /**
- * Evaluetes req.usersPromise and sends matching elements to the client.
+ * Evaluates req.usersPromise and sends matching elements to the client.
  * @param {object} req - Request object
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
