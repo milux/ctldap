@@ -258,7 +258,7 @@ function requestUsers (req, res, next) {
             uid: cn,
             nsuniqueid: "u" + v.id,
             givenname: v.vorname,
-            street: v.street,
+            street: v.strasse,
             telephoneMobile: v.telefonhandy,
             telephoneHome: v.telefonprivat,
             postalCode: v.plz,
