@@ -131,7 +131,7 @@ if (typeof config.cache_lifetime !== 'number') {
 function apiLogin(site) {
   if (site.loginPromise === null) {
     if (config.debug) {
-      console.log("Performing API login...");
+      console.log("[DEBUG] Performing API login...");
     }
     site.loginPromise = rp({
       "method": "POST",
@@ -148,7 +148,7 @@ function apiLogin(site) {
         throw new Error(result.data);
       }
       if (config.debug) {
-        console.log("API login completed");
+        console.log("[DEBUG] API login completed");
       }
       // clear login promise
       site.loginPromise = null;
@@ -156,7 +156,7 @@ function apiLogin(site) {
       return null;
     }).catch(function (error) {
       if (config.debug) {
-        console.log("API login failed!");
+        console.log("[DEBUG] API login failed!");
       }
       // clear login promise
       site.loginPromise = null;
@@ -164,7 +164,7 @@ function apiLogin(site) {
       throw new Error(error);
     });
   } else if (config.debug) {
-    console.log("Return pending login promise");
+    console.log("[DEBUG] Return pending login promise");
   }
   return site.loginPromise;
 }
@@ -188,12 +188,12 @@ function apiPost(site, func, data, triedLogin) {
       // If this was the first attempt, login and try again
       if (!triedLogin) {
         if (config.debug) {
-          console.log("Session invalid, login and retry...");
+          console.log("[DEBUG] Session invalid, login and retry...");
         }
         return apiLogin(site).then(function () {
           // Retry operation after login
           if (config.debug) {
-            console.log("Retry request to API function " + func + " after login");
+            console.log("[DEBUG] Retry request to API function " + func + " after login");
           }
           // Set "triedLogin" parameter to prevent looping
           return apiPost(site, func, data, true);
@@ -289,7 +289,7 @@ function requestUsers (req, res, next) {
       }
       var size = newCache.length;
       if (config.debug && size > 0) {
-        console.log("Updated users: " + size);
+        console.log("[DEBUG] Updated users: " + size);
       }
       return newCache;
     });
@@ -326,7 +326,7 @@ function requestGroups (req, res, next) {
       });
       var size = newCache.length;
       if (config.debug && size > 0) {
-        console.log("Updated groups: " + size);
+        console.log("[DEBUG] Updated groups: " + size);
       }
       return newCache;
     });
@@ -356,8 +356,8 @@ function authorize(req, res, next) {
  */
 function searchLogging (req, res, next) {
   if (config.debug) {
-    console.log("SEARCH base object: " + req.dn.toString() + " scope: " + req.scope);
-    console.log("Filter: " + req.filter.toString());
+    console.log("[DEBUG] SEARCH base object: " + req.dn.toString() + " scope: " + req.scope);
+    console.log("[DEBUG] Filter: " + req.filter.toString());
   }
   return next();
 }
@@ -374,7 +374,7 @@ function sendUsers (req, res, next) {
     users.forEach(function (u) {
       if ((req.checkAll || strDn === u.dn) && (req.filter.matches(u.attributes))) {
         if (config.debug) {
-          console.log("MatchUser: " + u.dn);
+          console.log("[DEBUG] MatchUser: " + u.dn);
         }
         res.send(u);
       }
@@ -399,7 +399,7 @@ function sendGroups (req, res, next) {
     groups.forEach(function (g) {
       if ((req.checkAll || strDn === g.dn) && (req.filter.matches(g.attributes))) {
         if (config.debug) {
-          console.log("MatchGroup: " + g.dn);
+          console.log("[DEBUG] MatchGroup: " + g.dn);
         }
         res.send(g);
       }
@@ -433,14 +433,14 @@ function authenticate (req, res, next) {
   var site = req.site;
   if (req.dn.equals(site.adminDn)) {
     if (config.debug)  {
-      console.log('Admin bind DN: ' + req.dn.toString());
+      console.log('[DEBUG] Admin bind DN: ' + req.dn.toString());
     }
     // If ldap_password is undefined, try a default ChurchTools authentication with this user
     if (site.ldap_password !== undefined) {
       site.checkPassword(req.credentials, function (result) {
         if (result) {
           if (config.debug) {
-            console.log("Authentication success");
+            console.log("[DEBUG] Authentication success");
           }
           return next();
         } else {
@@ -451,14 +451,14 @@ function authenticate (req, res, next) {
       return;
     }
   } else if (config.debug) {
-    console.log('Bind user DN: ' + req.dn.toString());
+    console.log('[DEBUG] Bind user DN: ' + req.dn.toString());
   }
   apiPost(site, "authenticate", {
     "user": req.dn.rdns[0].cn,
     "password": req.credentials
   }).then(function () {
     if (config.debug) {
-      console.log("Authentication successful for " + req.dn.toString());
+      console.log("[DEBUG] Authentication successful for " + req.dn.toString());
     }
     return next();
   }).catch(function (error) {
