@@ -1,6 +1,7 @@
-// ChurchTools LDAP-Wrapper 2.0
+// ChurchTools LDAP-Wrapper 2.1
 // This tool requires a node.js-Server and ChurchTools >= 3.25.0
 // (c) 2017 Michael Lux
+// (c) 2019 André Schild
 // License: GNU/GPL v3.0
 
 var ldap = require('ldapjs');
@@ -8,10 +9,13 @@ var fs = require('fs');
 var ini = require('ini');
 var rp = require('request-promise');
 var ldapEsc = require('ldap-escape');
+var parseDN = require('ldapjs').parseDN;
 var extend = require('extend');
 var Promise = require("bluebird");
 var path = require('path');
 var bcrypt = require('bcrypt');
+
+var helpers = require('ldap-filter/lib/helpers');
 
 var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
 if (config.debug) {
@@ -285,6 +289,7 @@ function requestUsers (req, res, next) {
             uid: cn,
             nsuniqueid: "u0",
             givenname: "LDAP Administrator",
+            objectclass: ['CTPerson'],
           }
         });
       }
@@ -373,7 +378,7 @@ function sendUsers (req, res, next) {
   var strDn = req.dn.toString();
   req.usersPromise.then(function (users) {
     users.forEach(function (u) {
-      if ((req.checkAll || strDn === u.dn) && (req.filter.matches(u.attributes))) {
+      if ((req.checkAll || parseDN(strDn).equals(parseDN(u.dn))) && (req.filter.matches(u.attributes))) {
         if (config.debug) {
           console.log("[DEBUG] MatchUser: " + u.dn);
         }
@@ -390,7 +395,7 @@ function sendUsers (req, res, next) {
 }
 
 /**
- * Evaluetes req.groupsPromise and sends matching elements to the client.
+ * Evaluates req.groupsPromise and sends matching elements to the client.
  * @param {object} req - Request object
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
@@ -399,7 +404,7 @@ function sendGroups (req, res, next) {
   var strDn = req.dn.toString();
   req.groupsPromise.then(function (groups) {
     groups.forEach(function (g) {
-      if ((req.checkAll || strDn === g.dn) && (req.filter.matches(g.attributes))) {
+      if ((req.checkAll || parseDN(strDn).equals(parseDN(g.dn))) && (req.filter.matches(g.attributes))) {
         if (config.debug) {
           console.log("[DEBUG] MatchGroup: " + g.dn);
         }
@@ -536,6 +541,36 @@ server.search('', function (req, res, next) {
 
   res.end();
 }, endSuccess);
+
+
+function escapeRegExp(str) {
+  /* JSSTYLED */
+  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
+}
+
+/** Case insensitive search on substring filters */
+ldap.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
+  var tv = helpers.getAttrValue(target, this.attribute, strictAttrCase);
+  if (tv !== undefined && tv !== null) {
+    var re = '';
+
+    if (this.initial)
+      re += '^' + escapeRegExp(this.initial) + '.*';
+    this.any.forEach(function (s) {
+      re += escapeRegExp(s) + '.*';
+    });
+    if (this.final)
+      re += escapeRegExp(this.final) + '$';
+
+    var matcher = new RegExp(re, 'i');
+    return helpers.testValues(function (v) {
+      return matcher.test(v);
+    }, tv);
+  }
+
+  return false;
+};
+
 
 // Start LDAP server
 server.listen(parseInt(config.ldap_port), function () {
