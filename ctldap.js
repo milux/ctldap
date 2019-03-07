@@ -204,7 +204,8 @@ function apiPost(site, func, data, triedLogin) {
     }
     return result.data;
   }, function (error) {
-    console.log(error.message);
+    console.log("[ERROR] "+error.message);
+    console.log(error.stack);
   });
 }
 
@@ -342,7 +343,7 @@ function requestGroups (req, res, next) {
  */
 function authorize(req, res, next) {
   if (!req.connection.ldap.bindDN.equals(req.site.adminDn)) {
-    console.log("Rejected search without proper binding!");
+    console.log("[WARN] Rejected search without proper binding!");
     return next(new ldap.InsufficientAccessRightsError());
   }
   return next();
@@ -381,8 +382,9 @@ function sendUsers (req, res, next) {
     });
     return next();
   }).catch(function (error) {
-    console.log("Error while retrieving users: ");
+    console.log("[ERROR] Error while retrieving users: ");
     console.log(error.message);
+    console.log(error.stack);
     return next();
   });
 }
@@ -406,8 +408,9 @@ function sendGroups (req, res, next) {
     });
     return next();
   }).catch(function (error) {
-    console.log("Error while retrieving groups: ");
+    console.log("[ERROR] Error while retrieving groups: ");
     console.log(error.message);
+    console.log(error.stack);
     return next();
   });
 }
@@ -444,7 +447,7 @@ function authenticate (req, res, next) {
           }
           return next();
         } else {
-          console.log("Invalid root password!");
+          console.log("[WARN] Invalid root password!");
           return next(new ldap.InvalidCredentialsError());
         }
       });
@@ -462,8 +465,9 @@ function authenticate (req, res, next) {
     }
     return next();
   }).catch(function (error) {
-    console.log("Authentication error: ");
+    console.log("[WARN] Authentication error: ");
     console.log(error.message);
+    console.log(error.stack);
     return next(new ldap.InvalidCredentialsError());
   });
 }
