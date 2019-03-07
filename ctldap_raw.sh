@@ -6,7 +6,7 @@
 # Required-Stop:     $remote_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: ChurchTools LDAP-Wrapper v2.0
+# Short-Description: ChurchTools LDAP-Wrapper v2.1
 # Description:       Init script for the ChurchTools LDAP Wrapper.
 ### END INIT INFO
 

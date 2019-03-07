@@ -459,10 +459,10 @@ function authenticate (req, res, next) {
       return;
     }
   } else if (config.debug) {
-    console.log('[DEBUG] Bind user DN: ' + req.dn.toString());
+    console.log('[DEBUG] Bind user DN: %s', req.dn);
   }
   apiPost(site, "authenticate", {
-    "user": req.dn.rdns[0].cn,
+    "user": req.dn.rdns[0].attrs.cn.value,
     "password": req.credentials
   }).then(function () {
     if (config.debug) {
