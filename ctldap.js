@@ -1,6 +1,7 @@
-// ChurchTools LDAP-Wrapper 2.0
+// ChurchTools LDAP-Wrapper 2.1
 // This tool requires a node.js-Server and ChurchTools >= 3.25.0
 // (c) 2017 Michael Lux
+// (c) 2019 André Schild
 // License: GNU/GPL v3.0
 
 var ldap = require('ldapjs');
@@ -8,10 +9,13 @@ var fs = require('fs');
 var ini = require('ini');
 var rp = require('request-promise');
 var ldapEsc = require('ldap-escape');
+var parseDN = require('ldapjs').parseDN;
 var extend = require('extend');
 var Promise = require("bluebird");
 var path = require('path');
 var bcrypt = require('bcrypt');
+
+var helpers = require('ldap-filter/lib/helpers');
 
 var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
 if (config.debug) {
@@ -131,7 +135,7 @@ if (typeof config.cache_lifetime !== 'number') {
 function apiLogin(site) {
   if (site.loginPromise === null) {
     if (config.debug) {
-      console.log("Performing API login...");
+      console.log("[DEBUG] Performing API login...");
     }
     site.loginPromise = rp({
       "method": "POST",
@@ -148,7 +152,7 @@ function apiLogin(site) {
         throw new Error(result.data);
       }
       if (config.debug) {
-        console.log("API login completed");
+        console.log("[DEBUG] API login completed");
       }
       // clear login promise
       site.loginPromise = null;
@@ -156,7 +160,7 @@ function apiLogin(site) {
       return null;
     }).catch(function (error) {
       if (config.debug) {
-        console.log("API login failed!");
+        console.log("[DEBUG] API login failed!");
       }
       // clear login promise
       site.loginPromise = null;
@@ -164,7 +168,7 @@ function apiLogin(site) {
       throw new Error(error);
     });
   } else if (config.debug) {
-    console.log("Return pending login promise");
+    console.log("[DEBUG] Return pending login promise");
   }
   return site.loginPromise;
 }
@@ -188,12 +192,12 @@ function apiPost(site, func, data, triedLogin) {
       // If this was the first attempt, login and try again
       if (!triedLogin) {
         if (config.debug) {
-          console.log("Session invalid, login and retry...");
+          console.log("[DEBUG] Session invalid, login and retry...");
         }
         return apiLogin(site).then(function () {
           // Retry operation after login
           if (config.debug) {
-            console.log("Retry request to API function " + func + " after login");
+            console.log("[DEBUG] Retry request to API function " + func + " after login");
           }
           // Set "triedLogin" parameter to prevent looping
           return apiPost(site, func, data, true);
@@ -204,7 +208,8 @@ function apiPost(site, func, data, triedLogin) {
     }
     return result.data;
   }, function (error) {
-    console.log(error.message);
+    console.log("[ERROR] "+error.message);
+    console.log(error.stack);
   });
 }
 
@@ -257,7 +262,7 @@ function requestUsers (req, res, next) {
             uid: cn,
             nsuniqueid: "u" + v.id,
             givenname: v.vorname,
-            street: v.street,
+            street: v.strasse,
             telephoneMobile: v.telefonhandy,
             telephoneHome: v.telefonprivat,
             postalCode: v.plz,
@@ -284,12 +289,13 @@ function requestUsers (req, res, next) {
             uid: cn,
             nsuniqueid: "u0",
             givenname: "LDAP Administrator",
+            objectclass: ['CTPerson'],
           }
         });
       }
       var size = newCache.length;
       if (config.debug && size > 0) {
-        console.log("Updated users: " + size);
+        console.log("[DEBUG] Updated users: " + size);
       }
       return newCache;
     });
@@ -326,7 +332,7 @@ function requestGroups (req, res, next) {
       });
       var size = newCache.length;
       if (config.debug && size > 0) {
-        console.log("Updated groups: " + size);
+        console.log("[DEBUG] Updated groups: " + size);
       }
       return newCache;
     });
@@ -342,7 +348,7 @@ function requestGroups (req, res, next) {
  */
 function authorize(req, res, next) {
   if (!req.connection.ldap.bindDN.equals(req.site.adminDn)) {
-    console.log("Rejected search without proper binding!");
+    console.log("[WARN] Rejected search without proper binding!");
     return next(new ldap.InsufficientAccessRightsError());
   }
   return next();
@@ -356,14 +362,14 @@ function authorize(req, res, next) {
  */
 function searchLogging (req, res, next) {
   if (config.debug) {
-    console.log("SEARCH base object: " + req.dn.toString() + " scope: " + req.scope);
-    console.log("Filter: " + req.filter.toString());
+    console.log("[DEBUG] SEARCH base object: " + req.dn.toString() + " scope: " + req.scope);
+    console.log("[DEBUG] Filter: " + req.filter.toString());
   }
   return next();
 }
 
 /**
- * Evaluetes req.usersPromise and sends matching elements to the client.
+ * Evaluates req.usersPromise and sends matching elements to the client.
  * @param {object} req - Request object
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
@@ -372,23 +378,24 @@ function sendUsers (req, res, next) {
   var strDn = req.dn.toString();
   req.usersPromise.then(function (users) {
     users.forEach(function (u) {
-      if ((req.checkAll || strDn === u.dn) && (req.filter.matches(u.attributes))) {
+      if ((req.checkAll || parseDN(strDn).equals(parseDN(u.dn))) && (req.filter.matches(u.attributes))) {
         if (config.debug) {
-          console.log("MatchUser: " + u.dn);
+          console.log("[DEBUG] MatchUser: " + u.dn);
         }
         res.send(u);
       }
     });
     return next();
   }).catch(function (error) {
-    console.log("Error while retrieving users: ");
+    console.log("[ERROR] Error while retrieving users: ");
     console.log(error.message);
+    console.log(error.stack);
     return next();
   });
 }
 
 /**
- * Evaluetes req.groupsPromise and sends matching elements to the client.
+ * Evaluates req.groupsPromise and sends matching elements to the client.
  * @param {object} req - Request object
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
@@ -397,17 +404,18 @@ function sendGroups (req, res, next) {
   var strDn = req.dn.toString();
   req.groupsPromise.then(function (groups) {
     groups.forEach(function (g) {
-      if ((req.checkAll || strDn === g.dn) && (req.filter.matches(g.attributes))) {
+      if ((req.checkAll || parseDN(strDn).equals(parseDN(g.dn))) && (req.filter.matches(g.attributes))) {
         if (config.debug) {
-          console.log("MatchGroup: " + g.dn);
+          console.log("[DEBUG] MatchGroup: " + g.dn);
         }
         res.send(g);
       }
     });
     return next();
   }).catch(function (error) {
-    console.log("Error while retrieving groups: ");
+    console.log("[ERROR] Error while retrieving groups: ");
     console.log(error.message);
+    console.log(error.stack);
     return next();
   });
 }
@@ -433,37 +441,38 @@ function authenticate (req, res, next) {
   var site = req.site;
   if (req.dn.equals(site.adminDn)) {
     if (config.debug)  {
-      console.log('Admin bind DN: ' + req.dn.toString());
+      console.log('[DEBUG] Admin bind DN: ' + req.dn.toString());
     }
     // If ldap_password is undefined, try a default ChurchTools authentication with this user
     if (site.ldap_password !== undefined) {
       site.checkPassword(req.credentials, function (result) {
         if (result) {
           if (config.debug) {
-            console.log("Authentication success");
+            console.log("[DEBUG] Authentication success");
           }
           return next();
         } else {
-          console.log("Invalid root password!");
+          console.log("[WARN] Invalid root password!");
           return next(new ldap.InvalidCredentialsError());
         }
       });
       return;
     }
   } else if (config.debug) {
-    console.log('Bind user DN: ' + req.dn.toString());
+    console.log('[DEBUG] Bind user DN: %s', req.dn);
   }
   apiPost(site, "authenticate", {
-    "user": req.dn.rdns[0].cn,
+    "user": req.dn.rdns[0].attrs.cn.value,
     "password": req.credentials
   }).then(function () {
     if (config.debug) {
-      console.log("Authentication successful for " + req.dn.toString());
+      console.log("[DEBUG] Authentication successful for " + req.dn.toString());
     }
     return next();
   }).catch(function (error) {
-    console.log("Authentication error: ");
+    console.log("[WARN] Authentication error: ");
     console.log(error.message);
+    console.log(error.stack);
     return next(new ldap.InvalidCredentialsError());
   });
 }
@@ -532,6 +541,36 @@ server.search('', function (req, res, next) {
 
   res.end();
 }, endSuccess);
+
+
+function escapeRegExp(str) {
+  /* JSSTYLED */
+  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
+}
+
+/** Case insensitive search on substring filters */
+ldap.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
+  var tv = helpers.getAttrValue(target, this.attribute, strictAttrCase);
+  if (tv !== undefined && tv !== null) {
+    var re = '';
+
+    if (this.initial)
+      re += '^' + escapeRegExp(this.initial) + '.*';
+    this.any.forEach(function (s) {
+      re += escapeRegExp(s) + '.*';
+    });
+    if (this.final)
+      re += escapeRegExp(this.final) + '$';
+
+    var matcher = new RegExp(re, 'i');
+    return helpers.testValues(function (v) {
+      return matcher.test(v);
+    }, tv);
+  }
+
+  return false;
+};
+
 
 // Start LDAP server
 server.listen(parseInt(config.ldap_port), function () {
