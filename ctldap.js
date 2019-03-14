@@ -573,6 +573,6 @@ ldap.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
 
 
 // Start LDAP server
-server.listen(parseInt(config.ldap_port), function () {
+server.listen(parseInt(config.ldap_port), config.ldap_ip, function () {
   console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
 });
