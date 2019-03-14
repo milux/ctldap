@@ -39,7 +39,7 @@ start)
     else
         echo $PID > $PIDFILE
         echo "$DESC started"
-        DPORT=$( cat $CTLDAP/ctldap.config | grep -oP "(?<=iptables_port=)[1-9][0-9]+" | head -n1 )
+        DPORT=$( cat $CTLDAP/ctldap.config | grep -oP "(?<=^iptables_port=)\s*[1-9][0-9]+" | head -n1 )
         if [ -n "$DPORT" ]; then
             echo "Trying to create iptables NAT rules for port redirect..."
             TO_PORT=$( cat $CTLDAP/ctldap.config | grep -oP "(?<=ldap_port=)[1-9][0-9]+" | head -n1 )
