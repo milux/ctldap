@@ -48,6 +48,10 @@ if (config.ct_uri.slice(-1) !== "/") {
   config.ct_uri += "/";
 }
 
+function cnNormalize(cn) {
+    return cn.replace("(","").replace(")","");
+}
+
 /**
  * Returns a promise for the login on the ChurchTools API.
  * If a pending login promise already exists, it is returned right away.
@@ -170,7 +174,7 @@ function requestUsers (req, res, next) {
   req.usersPromise = getCached(USERS_KEY, config.cache_lifetime, function () {
     return apiPost("getUsersData").then(function (results) {
       var newCache = results.users.map(function (v) {
-        var cn = v.cmsuserid;
+        var cn = cnNormalize(v.cmsuserid);
         return {
           dn: compatTransform(fnUserDn({ cn: cn })),
           attributes: {
@@ -216,6 +220,11 @@ function requestUsers (req, res, next) {
       if (config.debug && size > 0) {
         console.log("Updated users: " + size);
       }
+      newCache = newCache.sort(function(a, b) {
+          if(a.attributes.cn < b.attributes.cn) { return -1; }
+          if(a.attributes.cn > b.attributes.cn) { return 1; }
+          return 0;
+      });
       return newCache;
     });
   });
@@ -232,7 +241,7 @@ function requestGroups (req, res, next) {
   req.groupsPromise = getCached(GROUPS_KEY, config.cache_lifetime, function () {
     return apiPost("getGroupsData").then(async function (results) {
       var newCache = results.groups.map(function (v) {
-        var cn = v.bezeichnung;
+        var cn = cnNormalize(v.bezeichnung);
         var groupType = v.gruppentyp;
         return {
           dn: compatTransform(fnGroupDn({ cn: cn })),
@@ -250,7 +259,7 @@ function requestGroups (req, res, next) {
       });
       // Virtual "all" group
       {
-        var cn = "all";
+        var cn = cnNormalize("all");
         var reqUsers ={};
         requestUsers(reqUsers, null, function () {});
         // add all group asynchronously
@@ -274,6 +283,11 @@ function requestGroups (req, res, next) {
       if (config.debug && size > 0) {
         console.log("Updated groups: " + size);
       }
+      newCache = newCache.sort(function(a, b) {
+          if(a.attributes.cn < b.attributes.cn) { return -1; }
+          if(a.attributes.cn > b.attributes.cn) { return 1; }
+          return 0;
+      });
       return newCache;
     });
   });
