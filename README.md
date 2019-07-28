@@ -1,4 +1,4 @@
-# LDAP Wrapper for ChurchTools v2.0
+# LDAP Wrapper for ChurchTools v2.1
 
 This software acts as an LDAP server for ChurchTools >= 3.25.0
 

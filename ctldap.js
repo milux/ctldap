@@ -195,6 +195,8 @@ function requestUsers (req, res, next) {
           }
         };
       });
+      // add all group to everyone
+      newCache.forEach(function (user) {user.attributes.memberof.push(fnGroupDn({cn: "all"})) });
       // Virtual admin user
       if (config.ldap_password !== undefined) {
         var cn = config.ldap_user;
@@ -228,7 +230,7 @@ function requestUsers (req, res, next) {
  */
 function requestGroups (req, res, next) {
   req.groupsPromise = getCached(GROUPS_KEY, config.cache_lifetime, function () {
-    return apiPost("getGroupsData").then(function (results) {
+    return apiPost("getGroupsData").then(async function (results) {
       var newCache = results.groups.map(function (v) {
         var cn = v.bezeichnung;
         var groupType = v.gruppentyp;
@@ -246,6 +248,28 @@ function requestGroups (req, res, next) {
           }
         };
       });
+      // Virtual "all" group
+      {
+        var cn = "all";
+        var reqUsers ={};
+        requestUsers(reqUsers, null, function () {});
+        // add all group asynchronously
+         await reqUsers.usersPromise.then(function (users) {
+            newCache.push({
+                dn: compatTransform(fnGroupDn({cn: cn})),
+                attributes: {
+                    cn: cn,
+                    displayname: cn,
+                    id: 9999990,
+                    nsuniqueid: "g" + 9999990,
+                    objectclass: ["group", "CTGroup" + cn.charAt(0).toUpperCase() + cn.slice(1)],
+                    uniquemember: (users|| []).map(function (user) {
+                        return compatTransform(fnUserDn({cn: user.attributes.cn}));
+                    })
+                }
+            });
+        });
+      }
       var size = newCache.length;
       if (config.debug && size > 0) {
         console.log("Updated groups: " + size);
@@ -265,7 +289,7 @@ function requestGroups (req, res, next) {
 function authorize(req, res, next) {
   if (!req.connection.ldap.bindDN.equals(adminDn)) {
     console.log("Rejected search without proper binding!");
-    // return next(new ldap.InsufficientAccessRightsError());
+    // return next(new ldap.InsufficientAccessRightsError()); // deactivate this if you also want allow other users to login
   }
   return next();
 }
@@ -285,7 +309,7 @@ function searchLogging (req, res, next) {
 }
 
 /**
- * Evaluetes req.usersPromise and sends matching elements to the client.
+ * Evaluates req.usersPromise and sends matching elements to the client.
  * @param {object} req - Request object
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
@@ -437,3 +461,8 @@ apiLogin().then(function () {
   console.log("Error at login to ChurchTools: ");
   console.log(new Error(error));
 });
+
+
+var reqUsers = {};
+var reqGroups = {};
+requestUsers(reqUsers, null, function() {requestGroups(reqGroups, null, function () {})});
