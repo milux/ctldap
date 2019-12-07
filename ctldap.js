@@ -79,7 +79,7 @@ Object.keys(config.sites).map(function(sitename, index) {
     };
   } else {
     site.uniqueEmails = function (users) {
-      return s;
+      return users;
     };
   }
   if (site.ldap_password_bcrypt || ((site.ldap_password_bcrypt === undefined) && config.ldap_password_bcrypt)) {
