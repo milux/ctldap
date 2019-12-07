@@ -45,20 +45,38 @@ Object.keys(config.sites).map(function(sitename, index) {
   if (site.dn_lower_case || ((site.dn_lower_case === undefined) && config.dn_lower_case)) {
     site.compatTransform = function (s) {
       return s.toLowerCase();
-    }
+    };
   } else {
     site.compatTransform = function (s) {
       return s;
-    }
+    };
   }
   if (site.email_lower_case || ((site.email_lower_case === undefined) && config.email_lower_case)) {
     site.compatTransformEmail = function (s) {
       return s ? s.toLowerCase() : s;
-    }
+    };
   } else {
     site.compatTransformEmail = function (s) {
       return s;
-    }
+    };
+  }
+  if (site.emails_unique || ((site.emails_unique === undefined) && config.emails_unique)) {
+    site.uniqueEmails = function (users) {
+      var mails = {};
+      var filteredUsers = users.filter(function (user) {
+        if (!user.attributes.email || (user.attributes.email == '')) {
+          return false;
+        }
+        var result = !(user.attributes.email in mails);
+        mails[user.attributes.email] = true;
+        return result;
+      });
+      return filteredUsers;
+    };
+  } else {
+    site.uniqueEmails = function (users) {
+      return s;
+    };
   }
   if (site.ldap_password_bcrypt || ((site.ldap_password_bcrypt === undefined) && config.ldap_password_bcrypt)) {
     site.checkPassword = function (password, callback) {
@@ -272,6 +290,7 @@ function requestUsers (req, res, next) {
           }
         };
       });
+      newCache = site.uniqueEmails(newCache);
       // Virtual admin user
       if (site.ldap_password !== undefined) {
         var cn = config.ldap_user;
