@@ -155,6 +155,7 @@ function apiLogin(site) {
     if (config.debug) {
       console.log("[DEBUG] Performing API login...");
     }
+    site.csrftoken = 'foobar';
     site.loginPromise = rp({
       "method": "POST",
       "jar": site.cookieJar,
@@ -169,6 +170,28 @@ function apiLogin(site) {
       if (result.status !== "success") {
         throw new Error(result.data);
       }
+      if (config.debug) {
+        console.log("[DEBUG] API login successful, fetching CSRF-Token...");
+      }
+      return rp({
+        "method": "GET",
+        "jar": site.cookieJar,
+        "uri": site.ct_uri + "/api/csrftoken",
+        "json": true
+      }).then(function (result) {
+        if (!result.data) {
+          throw new Error(result.data);
+        }
+        site.csrftoken = result.data;
+        if (config.debug) {
+          console.log("[DEBUG] Got CSRF-Token.");
+        }
+        return true;
+      }).catch(function (error) {
+        console.log("[DEBUG] Could not get CSRF-Token: ", error);
+        return true; // continue anyway, maybe this is an older CT selfhosting version
+      });
+    }).then(function () {
       if (config.debug) {
         console.log("[DEBUG] API login completed");
       }
@@ -202,6 +225,7 @@ function apiPost(site, func, data, triedLogin) {
   return rp({
     "method": "POST",
     "jar": site.cookieJar,
+    "headers": {'CSRF-Token': site.csrftoken},
     "uri": site.ct_uri + "?q=churchdb/ajax",
     "form": extend({ "func": func }, data || {}),
     "json": true
