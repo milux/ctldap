@@ -15,8 +15,7 @@
     "request-promise": "^4.2.1"
   },
   "devDependencies": {},
-    "scripts": {
-        "start": "node ctldap.js"
-    }
-
+  "scripts": {
+    "start": "node ctldap.js"
+  }
 }

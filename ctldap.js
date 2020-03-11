@@ -18,6 +18,22 @@ var bcrypt = require('bcrypt');
 var helpers = require('ldap-filter/lib/helpers');
 
 var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
+
+function logDebug(site, msg) {
+  if (config.debug) {
+    console.log("[DEBUG] "+site.sitename+" - "+msg);
+  }
+}
+
+function logWarn(site, msg) {
+  console.log("[WARN] "+site.sitename+" - "+msg);
+}
+
+function logError(site, msg, error) {
+  console.log("[ERROR] "+site.sitename+" - "+msg);
+  console.log(error.stack);
+}
+
 if (config.debug) {
   console.log("Debug mode enabled, expect lots of output!");
 }
@@ -27,6 +43,7 @@ if (config.ldap_base_dn) {
     config.sites = {};
   }
   config.sites[config.ldap_base_dn] = {
+    sitename: config.ldap_base_dn,
     ldap_password: config.ldap_password,
     ct_uri: config.ct_uri,
     api_user: config.api_user,
@@ -37,6 +54,7 @@ if (config.ldap_base_dn) {
 Object.keys(config.sites).map(function(sitename, index) {
   var site = config.sites[sitename];
 
+  site.sitename = sitename;
   site.fnUserDn = ldapEsc.dn("cn=${cn},ou=users,o=" + sitename);
   site.fnGroupDn = ldapEsc.dn("cn=${cn},ou=groups,o=" + sitename);
   site.cookieJar = rp.jar();
@@ -146,15 +164,32 @@ if (typeof config.cache_lifetime !== 'number') {
   config.cache_lifetime = 10000;  // 10 seconds
 }
 
+function getCsrfToken(site) {
+  return rp({
+    "method": "GET",
+    "jar": site.cookieJar,
+    "uri": site.ct_uri + "/api/csrftoken",
+    "json": true
+  }).then(function (result) {
+    if (!result.data) {
+      throw new Error(JSON.stringify(result));
+    }
+    site.csrftoken = result.data;
+    logDebug(site, "Got CSRF-Token.");
+    return true;
+  }).catch(function (error) {
+    logDebug(site, "Could not get CSRF-Token: "+ JSON.stringify(error));
+    return true; // continue anyway, maybe this is an older CT selfhosting version
+  });
+}
+
 /**
  * Returns a promise for the login on the ChurchTools API.
  * If a pending login promise already exists, it is returned right away.
  */
 function apiLogin(site) {
   if (site.loginPromise === null) {
-    if (config.debug) {
-      console.log("[DEBUG] Performing API login...");
-    }
+    logDebug(site, "Performing CT API login...");
     site.csrftoken = 'foobar';
     site.loginPromise = rp({
       "method": "POST",
@@ -168,48 +203,22 @@ function apiLogin(site) {
       "json": true
     }).then(function (result) {
       if (result.status !== "success") {
-        throw new Error(result.data);
+        logDebug(site, "CT API login failed: " + JSON.stringify(result));
+        // clear login promise
+        site.loginPromise = null;
+        throw new Error(JSON.stringify(result));
       }
-      if (config.debug) {
-        console.log("[DEBUG] API login successful, fetching CSRF-Token...");
-      }
-      return rp({
-        "method": "GET",
-        "jar": site.cookieJar,
-        "uri": site.ct_uri + "/api/csrftoken",
-        "json": true
-      }).then(function (result) {
-        if (!result.data) {
-          throw new Error(result.data);
-        }
-        site.csrftoken = result.data;
-        if (config.debug) {
-          console.log("[DEBUG] Got CSRF-Token.");
-        }
-        return true;
-      }).catch(function (error) {
-        console.log("[DEBUG] Could not get CSRF-Token: ", error);
-        return true; // continue anyway, maybe this is an older CT selfhosting version
-      });
+      logDebug(site, "CT API login successful, fetching CSRF-Token...");
+      return getCsrfToken(site);
     }).then(function () {
-      if (config.debug) {
-        console.log("[DEBUG] API login completed");
-      }
+      logDebug(site, "CT API login completed");
       // clear login promise
       site.loginPromise = null;
       // end gracefully
       return null;
-    }).catch(function (error) {
-      if (config.debug) {
-        console.log("[DEBUG] API login failed!");
-      }
-      // clear login promise
-      site.loginPromise = null;
-      // rethrow error
-      throw new Error(error);
     });
   } else if (config.debug) {
-    console.log("[DEBUG] Return pending login promise");
+    logDebug(site, "Return pending login promise");
   }
   return site.loginPromise;
 }
@@ -221,7 +230,8 @@ function apiLogin(site) {
  * @param {object} [data] - The optional form data to pass along with the POST request
  * @param {boolean} [triedLogin] - Is true if this is the second attempt after API login
  */
-function apiPost(site, func, data, triedLogin) {
+function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
+  logDebug(site, "Performing request to API function "+func);
   return rp({
     "method": "POST",
     "jar": site.cookieJar,
@@ -233,25 +243,30 @@ function apiPost(site, func, data, triedLogin) {
     if (result.status !== "success") {
       // If this was the first attempt, login and try again
       if (!triedLogin) {
-        if (config.debug) {
-          console.log("[DEBUG] Session invalid, login and retry...");
-        }
+        logDebug(site, "CT session invalid, login and retry...");
         return apiLogin(site).then(function () {
           // Retry operation after login
-          if (config.debug) {
-            console.log("[DEBUG] Retry request to API function " + func + " after login");
-          }
+          logDebug(site, "Retry request to API function " + func + " after login");
           // Set "triedLogin" parameter to prevent looping
-          return apiPost(site, func, data, true);
+          return apiPost(site, func, data, true, triedCSRFUpdate);
         });
       } else {
-        throw new Error(result);
+        logError(site, "CT API request still not working after login:");
+        throw new Error(JSON.stringify(result));
       }
     }
     return result.data;
   }, function (error) {
-    console.log("[ERROR] "+error.message);
-    console.log(error.stack);
+    if ((error.error.errors[0].message === "CSRF-Token is invalid") && !triedCSRFUpdate) {
+      logDebug(site, "CSRF token is invalid, get new one and retry...");
+      return getCsrfToken(site).then(function() {
+        // Retry operation
+        logDebug(site, "Retry request to API function " + func + " with fresh CSRF token");
+        // Set "triedCSRFUpdate" parameter to prevent looping
+        return apiPost(site, func, data, triedLogin, true);
+      });
+    }
+    throw error;
   });
 }
 
@@ -268,6 +283,7 @@ function getCached(site, key, maxAge, factory) {
     var time = new Date().getTime();
     var co = site.CACHE[key] || { time: -1, entry: null };
     if (time - maxAge < co.time) {
+      logDebug(site, "using cached data");
       resolve(co.entry);
     } else {
       // Call the factory() function to retrieve the Promise for the fresh entry
@@ -337,9 +353,7 @@ function requestUsers (req, res, next) {
         });
       }
       var size = newCache.length;
-      if (config.debug && size > 0) {
-        console.log("[DEBUG] Updated users: " + size);
-      }
+      logDebug(site, "Updated users: " + size);
       return newCache;
     });
   });
@@ -374,9 +388,7 @@ function requestGroups (req, res, next) {
         };
       });
       var size = newCache.length;
-      if (config.debug && size > 0) {
-        console.log("[DEBUG] Updated groups: " + size);
-      }
+      logDebug(site, "Updated groups: " + size);
       return newCache;
     });
   });
@@ -391,7 +403,7 @@ function requestGroups (req, res, next) {
  */
 function authorize(req, res, next) {
   if (!req.connection.ldap.bindDN.equals(req.site.adminDn)) {
-    console.log("[WARN] Rejected search without proper binding!");
+    logWarn(req.site, "Rejected search without proper binding!");
     return next(new ldap.InsufficientAccessRightsError());
   }
   return next();
@@ -404,10 +416,8 @@ function authorize(req, res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function searchLogging (req, res, next) {
-  if (config.debug) {
-    console.log("[DEBUG] SEARCH base object: " + req.dn.toString() + " scope: " + req.scope);
-    console.log("[DEBUG] Filter: " + req.filter.toString());
-  }
+  logDebug(req.site, "SEARCH base object: " + req.dn.toString() + " scope: " + req.scope);
+  logDebug(req.site, "Filter: " + req.filter.toString());
   return next();
 }
 
@@ -422,17 +432,13 @@ function sendUsers (req, res, next) {
   req.usersPromise.then(function (users) {
     users.forEach(function (u) {
       if ((req.checkAll || parseDN(strDn).equals(parseDN(u.dn))) && (req.filter.matches(u.attributes))) {
-        if (config.debug) {
-          console.log("[DEBUG] MatchUser: " + u.dn);
-        }
+        logDebug(req.site, "MatchUser: " + u.dn);
         res.send(u);
       }
     });
     return next();
   }).catch(function (error) {
-    console.log("[ERROR] Error while retrieving users: ");
-    console.log(error.message);
-    console.log(error.stack);
+    logError(req.site, "Error while retrieving users: ", error);
     return next();
   });
 }
@@ -448,17 +454,13 @@ function sendGroups (req, res, next) {
   req.groupsPromise.then(function (groups) {
     groups.forEach(function (g) {
       if ((req.checkAll || parseDN(strDn).equals(parseDN(g.dn))) && (req.filter.matches(g.attributes))) {
-        if (config.debug) {
-          console.log("[DEBUG] MatchGroup: " + g.dn);
-        }
+        logDebug(req.site, "MatchGroup: " + g.dn);
         res.send(g);
       }
     });
     return next();
   }).catch(function (error) {
-    console.log("[ERROR] Error while retrieving groups: ");
-    console.log(error.message);
-    console.log(error.stack);
+    logError(req.site, "Error while retrieving groups: ", error);
     return next();
   });
 }
@@ -483,39 +485,31 @@ function endSuccess (req, res, next) {
 function authenticate (req, res, next) {
   var site = req.site;
   if (req.dn.equals(site.adminDn)) {
-    if (config.debug)  {
-      console.log('[DEBUG] Admin bind DN: ' + req.dn.toString());
-    }
+    logDebug(site, "Admin bind DN: " + req.dn.toString());
     // If ldap_password is undefined, try a default ChurchTools authentication with this user
     if (site.ldap_password !== undefined) {
       site.checkPassword(req.credentials, function (result) {
         if (result) {
-          if (config.debug) {
-            console.log("[DEBUG] Authentication success");
-          }
+          logDebug(site, "Authentication success");
           return next();
         } else {
-          console.log("[WARN] Invalid root password!");
+          logWarn(site, "Invalid root password!");
           return next(new ldap.InvalidCredentialsError());
         }
       });
       return;
     }
-  } else if (config.debug) {
-    console.log('[DEBUG] Bind user DN: %s', req.dn);
+  } else {
+    logDebug(site, "Bind user DN: %s", req.dn);
   }
   apiPost(site, "authenticate", {
     "user": req.dn.rdns[0].attrs.cn.value,
     "password": req.credentials
   }).then(function () {
-    if (config.debug) {
-      console.log("[DEBUG] Authentication successful for " + req.dn.toString());
-    }
+    logDebug(site, "Authentication successful for " + req.dn.toString());
     return next();
   }).catch(function (error) {
-    console.log("[WARN] Authentication error: ");
-    console.log(error.message);
-    console.log(error.stack);
+    logError(site, "Authentication error: ", error);
     return next(new ldap.InvalidCredentialsError());
   });
 }
@@ -531,45 +525,37 @@ Object.keys(config.sites).map(function(sitename, index) {
   server.search("ou=users,o=" + sitename, function (req, res, next) {
     req.site = config.sites[sitename];
     next();
-  }, searchLogging, authorize, requestUsers, function (req, res, next) {
-    if (config.debug) {
-      console.log("[DEBUG] request for users");
-    }
+  }, searchLogging, authorize, function (req, res, next) {
+    logDebug({ sitename: sitename }, "Search for users");
     req.checkAll = req.scope !== "base";
     return next();
-  }, sendUsers, endSuccess);
+  }, requestUsers, sendUsers, endSuccess);
 
   // Search implementation for group search
   server.search("ou=groups,o=" + sitename, function (req, res, next) {
     req.site = config.sites[sitename];
     next();
-  }, searchLogging, authorize, requestGroups, function (req, res, next) {
-    if (config.debug) {
-      console.log("[DEBUG] request for groups");
-    }
+  }, searchLogging, authorize, function (req, res, next) {
+    logDebug({ sitename: sitename }, "Search for groups");
     req.checkAll = req.scope !== "base";
     return next();
-  }, sendGroups, endSuccess);
+  }, requestGroups, sendGroups, endSuccess);
 
   // Search implementation for user and group search
   server.search("o=" + sitename, function (req, res, next) {
     req.site = config.sites[sitename];
     next();
-  }, searchLogging, authorize, requestUsers, requestGroups, function (req, res, next) {
-    if (config.debug) {
-      console.log("[DEBUG] request for users and groups combined");
-    }
+  }, searchLogging, authorize, function (req, res, next) {
+    logDebug({ sitename: sitename }, "Search for users and groups combined");
     req.checkAll = req.scope === "sub";
     return next();
-  }, sendUsers, sendGroups, endSuccess);
+  }, requestUsers, requestGroups, sendUsers, sendGroups, endSuccess);
 
 });
 
 // Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
 server.search('', function (req, res, next) {
-  if (config.debug) {
-    console.log("[DEBUG] empty request, return directory information");
-  }
+  logDebug({ sitename: req.dn.o }, "empty request, return directory information");
   var obj = {
     "attributes": {
       "objectClass": ["top", "OpenLDAProotDSE"],
