@@ -6,7 +6,7 @@
 # Required-Stop:     $remote_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: ChurchTools LDAP-Wrapper v2.0
+# Short-Description: ChurchTools LDAP-Wrapper v2.1
 # Description:       Init script for the ChurchTools LDAP Wrapper.
 ### END INIT INFO
 
@@ -39,10 +39,10 @@ start)
     else
         echo $PID > $PIDFILE
         echo "$DESC started"
-        DPORT=$( cat $CTLDAP/ctldap.config | grep -oP "(?<=^iptables_port=)[1-9][0-9]+" | head -n1 )
+        DPORT=$( cat $CTLDAP/ctldap.config | grep -P "^iptables_port\s*=\s*[1-9][0-9]+" | grep -oP "[1-9][0-9]+" | head -n1 )
         if [ -n "$DPORT" ]; then
             echo "Trying to create iptables NAT rules for port redirect..."
-            TO_PORT=$( cat $CTLDAP/ctldap.config | grep -oP "(?<=ldap_port=)[1-9][0-9]+" | head -n1 )
+            TO_PORT=$( cat $CTLDAP/ctldap.config | grep -P "^ldap_port\s*=\s*[1-9][0-9]+" | grep -oP "[1-9][0-9]+" | head -n1 )
             iptables -A PREROUTING -t nat -i eth0 -p tcp --dport "$DPORT" -j REDIRECT --to-port "$TO_PORT"
         fi
     fi
@@ -68,10 +68,10 @@ stop)
     if [ -f $PIDFILE ]; then
         kill -HUP $PID
         echo "$DESC stopped"
-        DPORT=$( cat $CTLDAP/ctldap.config | grep -oP "(?<=iptables_port=)[1-9][0-9]+" | head -n1 )
+        DPORT=$( cat $CTLDAP/ctldap.config | grep -P "^iptables_port\s*=\s*[1-9][0-9]+" | grep -oP "[1-9][0-9]+" | head -n1 )
         if [ -n "$DPORT" ]; then
             echo "Trying to remove iptables NAT rules..."
-            TO_PORT=$( cat $CTLDAP/ctldap.config | grep -oP "(?<=ldap_port=)[1-9][0-9]+" | head -n1 )
+            TO_PORT=$( cat $CTLDAP/ctldap.config | grep -P "^ldap_port\s*=\s*[1-9][0-9]+" | grep -oP "[1-9][0-9]+" | head -n1 )
             iptables -D PREROUTING -t nat -i eth0 -p tcp --dport "$DPORT" -j REDIRECT --to-port "$TO_PORT"
         fi
         rm -f $PIDFILE
