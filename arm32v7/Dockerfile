@@ -7,7 +7,7 @@ RUN apk add curl && curl -L ${QEMU_URL} | tar zxvf - -C . --strip-components 1
 # Build from parent directory with this command:
 # docker build -t milux/ctldap:arm32v7-latest -f ./arm32v7/Dockerfile .
 
-FROM arm32v7/node:12-alpine
+FROM arm32v7/node:12
 LABEL maintainer="Michael Lux <michi.lux@gmail.com>"
 
 COPY --from=qemu qemu-arm-static /usr/bin
