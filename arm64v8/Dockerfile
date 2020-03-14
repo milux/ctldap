@@ -1,8 +1,16 @@
+FROM alpine AS qemu
+
+# QEMU Download, see https://github.com/docker/hub-feedback/issues/1261
+ENV QEMU_URL https://github.com/balena-io/qemu/releases/download/v3.0.0%2Bresin/qemu-3.0.0+resin-aarch64.tar.gz
+RUN apk add curl && curl -L ${QEMU_URL} | tar zxvf - -C . --strip-components 1
+
 # Build from parent directory with this command:
 # docker build -t milux/ctldap:arm64v8-latest -f ./arm64v8/Dockerfile .
 
 FROM arm64v8/node:12-alpine
 LABEL maintainer="Michael Lux <michi.lux@gmail.com>"
+
+COPY --from=qemu qemu-arm-static /usr/bin
 
 RUN mkdir /app && chown node:node /app
 USER node

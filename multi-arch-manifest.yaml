@@ -1,0 +1,16 @@
+image: milux/ctldap:${FINAL_TAG}
+manifests:
+  - image: milux/ctldap:amd64-${FINAL_TAG}
+    platform:
+      architecture: amd64
+      os: linux
+  - image: milux/ctldap:arm32v7-${FINAL_TAG}
+    platform:
+      architecture: arm
+      os: linux
+      variant: v7
+  - image: milux/ctldap:arm64v8-${FINAL_TAG}
+    platform:
+      architecture: arm64
+      os: linux
+      variant: v8
