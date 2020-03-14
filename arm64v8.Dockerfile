@@ -5,7 +5,7 @@ ENV QEMU_URL https://github.com/balena-io/qemu/releases/download/v3.0.0%2Bresin/
 RUN apk add curl && curl -L ${QEMU_URL} | tar zxvf - -C . --strip-components 1
 
 # Build from parent directory with this command:
-# docker build -t milux/ctldap:arm64v8-latest -f ./arm64v8/Dockerfile .
+# docker build -t milux/ctldap:arm64v8-latest -f ./arm64v8.Dockerfile .
 
 FROM arm64v8/node:12
 LABEL maintainer="Michael Lux <michi.lux@gmail.com>"
