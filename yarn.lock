@@ -243,6 +243,13 @@ fast-json-stable-stringify@^2.0.0:
   resolved "https://registry.yarnpkg.com/fast-json-stable-stringify/-/fast-json-stable-stringify-2.1.0.tgz#874bf69c6f404c2b5d99c481341399fd55892633"
   integrity sha512-lhd/wF+Lk98HZoTCtlVraHtfh5XYijIjalXck7saUtuanSDyLMxnHhSXEDJqHxD7msR8D0uCmqlkwjCV8xvwHw==
 
+fmtr@^1.1.0:
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/fmtr/-/fmtr-1.1.2.tgz#344e5e9631a5bc29cafbea9e1e754fe7212dea98"
+  integrity sha512-GYZV5D+SI/2AZBWF2HHKTxdQ7fty+2C/Jq2lyTseyZ1VBkkznSE2wzlbUPAutesC0hmJFpe+KXt6mzPE7qUXiw==
+  dependencies:
+    lodash "^4.17.14"
+
 forever-agent@~0.6.1:
   version "0.6.1"
   resolved "https://registry.yarnpkg.com/forever-agent/-/forever-agent-0.6.1.tgz#fbc71f0c41adeb37f96c577ad1ed42d8fdacca91"
@@ -429,10 +436,13 @@ jsprim@^1.2.2:
     json-schema "0.2.3"
     verror "1.10.0"
 
-ldap-escape@^2.0.4:
-  version "2.0.4"
-  resolved "https://registry.yarnpkg.com/ldap-escape/-/ldap-escape-2.0.4.tgz#4a2420d6c46b787f84c6ea7fff2a1999f6fb4860"
-  integrity sha512-j29sWZOjN/PQ0/Q9o5ifDHM8Py8tpAh4Opr3Q27IsyFH1Fg9qFhg6aig76DBrmJlvUYfQsoK1z3wp+n9VBSLMQ==
+ldap-escape@^1.1.5:
+  version "1.1.5"
+  resolved "https://registry.yarnpkg.com/ldap-escape/-/ldap-escape-1.1.5.tgz#2316d46ebae9585bd72ea389eefa84a8c8c6a9ea"
+  integrity sha512-ss9KD4Eg3CyEZWQoC+10XBx7kL33QGekxYbXK1kn6SPNDu1Hf8Jb5q2FORHFr4vB8pHVeblo/VsnsG+UFoDCJA==
+  dependencies:
+    fmtr "^1.1.0"
+    lodash "^4.17.4"
 
 ldap-filter@0.2.2:
   version "0.2.2"
@@ -458,7 +468,7 @@ ldapjs@^1.0.2:
   optionalDependencies:
     dtrace-provider "~0.8"
 
-lodash@^4.17.15:
+lodash@^4.17.14, lodash@^4.17.15, lodash@^4.17.4:
   version "4.17.15"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.15.tgz#b447f6670a0455bbfeedd11392eff330ea097548"
   integrity sha512-8xOcRHvCjnocdS5cpwXQXVzmmh5e5+saE2QGoeQmbKmRS6J3VQppPOIt0MnmE+4xlZoumy0GPG0D0MVIQbNA1A==

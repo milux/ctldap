@@ -9,7 +9,7 @@
     "bluebird": "^3.5.0",
     "extend": "^3.0.1",
     "ini": "^1.1.0",
-    "ldap-escape": "^2.0.4",
+    "ldap-escape": "^1.1.5",
     "ldapjs": "^1.0.2",
     "request": "^2.81.0",
     "request-promise": "^4.2.1"
