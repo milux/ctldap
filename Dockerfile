@@ -1,12 +1,12 @@
-FROM node:alpine
-LABEL maintainer="Simon Scholl <s@sdscholl.de>"
+FROM node:12-alpine
+LABEL maintainer="Michael Lux <michi.lux@gmail.com>"
 
 RUN mkdir /app && chown node:node /app
 USER node
 WORKDIR /app
 
 COPY . .
-RUN npm install
+RUN yarn install
 
 EXPOSE 1389
 

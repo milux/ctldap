@@ -21,16 +21,16 @@ var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'),
 
 function logDebug(site, msg) {
   if (config.debug) {
-    console.log("[DEBUG] "+site.sitename+" - "+msg);
+    console.log("[DEBUG] " + site.sitename + " - " + msg);
   }
 }
 
 function logWarn(site, msg) {
-  console.log("[WARN] "+site.sitename+" - "+msg);
+  console.log("[WARN] " + site.sitename + " - " + msg);
 }
 
 function logError(site, msg, error) {
-  console.log("[ERROR] "+site.sitename+" - "+msg);
+  console.log("[ERROR] " + site.sitename + " - " + msg);
   console.log(error.stack);
 }
 
@@ -38,6 +38,7 @@ if (config.debug) {
   console.log("Debug mode enabled, expect lots of output!");
 }
 
+// If no sites are configured, create one from the global config properties
 if (config.ldap_base_dn) {
   if (!config.sites) {
     config.sites = {};
@@ -51,7 +52,7 @@ if (config.ldap_base_dn) {
   }
 }
 
-Object.keys(config.sites).map(function(sitename, index) {
+Object.keys(config.sites).map(function (sitename) {
   var site = config.sites[sitename];
 
   site.sitename = sitename;
@@ -59,14 +60,14 @@ Object.keys(config.sites).map(function(sitename, index) {
   site.fnGroupDn = ldapEsc.dn("cn=${cn},ou=groups,o=" + sitename);
   site.cookieJar = rp.jar();
   site.loginPromise = null;
-  site.adminDn = site.fnUserDn({cn: config.ldap_user});
+  site.adminDn = site.fnUserDn({ cn: config.ldap_user });
   site.CACHE = {};
   site.loginErrorCount = 0;
   site.loginBlockedDate = null;
 
   if (site.dn_lower_case || ((site.dn_lower_case === undefined) && config.dn_lower_case)) {
     site.compatTransform = function (s) {
-      return s.toLowerCase();
+      return typeof s === "string" ? s.toLowerCase() : s;
     };
   } else {
     site.compatTransform = function (s) {
@@ -75,7 +76,7 @@ Object.keys(config.sites).map(function(sitename, index) {
   }
   if (site.email_lower_case || ((site.email_lower_case === undefined) && config.email_lower_case)) {
     site.compatTransformEmail = function (s) {
-      return s ? s.toLowerCase() : s;
+      return typeof s === "string" ? s.toLowerCase() : s;
     };
   } else {
     site.compatTransformEmail = function (s) {
@@ -85,15 +86,14 @@ Object.keys(config.sites).map(function(sitename, index) {
   if (site.emails_unique || ((site.emails_unique === undefined) && config.emails_unique)) {
     site.uniqueEmails = function (users) {
       var mails = {};
-      var filteredUsers = users.filter(function (user) {
-        if (!user.attributes.email || (user.attributes.email == '')) {
+      return users.filter(function (user) {
+        if (!user.attributes.email) {
           return false;
         }
         var result = !(user.attributes.email in mails);
         mails[user.attributes.email] = true;
         return result;
       });
-      return filteredUsers;
     };
   } else {
     site.uniqueEmails = function (users) {
@@ -104,7 +104,7 @@ Object.keys(config.sites).map(function(sitename, index) {
     site.checkPassword = function (password, callback) {
       if (site.loginBlockedDate) {
         var now = new Date();
-        var checkDate = new Date(site.loginBlockedDate.getTime() + 1000*3600*24); // one day
+        var checkDate = new Date(site.loginBlockedDate.getTime() + 1000 * 3600 * 24); // one day
         if (now < checkDate) {
           callback(false);
           return;
@@ -114,7 +114,7 @@ Object.keys(config.sites).map(function(sitename, index) {
         }
       }
       var hash = site.ldap_password.replace(/^\$2y(.+)$/i, '$2a$1');
-      bcrypt.compare(password, hash, function(err, valid) {
+      bcrypt.compare(password, hash, function (_err, valid) {
         if (!valid) {
           site.loginErrorCount += 1;
           if (site.loginErrorCount > 5) {
@@ -128,7 +128,7 @@ Object.keys(config.sites).map(function(sitename, index) {
     site.checkPassword = function (password, callback) {
       if (site.loginBlockedDate) {
         var now = new Date();
-        var checkDate = new Date(site.loginBlockedDate.getTime() + 1000*3600*24); // one day
+        var checkDate = new Date(site.loginBlockedDate.getTime() + 1000 * 3600 * 24); // one day
         if (now < checkDate) {
           callback(false);
           return;
@@ -153,8 +153,8 @@ Object.keys(config.sites).map(function(sitename, index) {
 });
 
 if (config.ldap_cert_filename && config.ldap_key_filename) {
-  var ldapCert = fs.readFileSync(config.ldap_cert_filename, {encoding: "utf8"}),
-    ldapKey = fs.readFileSync(config.ldap_key_filename, {encoding: "utf8"});
+  var ldapCert = fs.readFileSync(config.ldap_cert_filename, { encoding: "utf8" }),
+    ldapKey = fs.readFileSync(config.ldap_key_filename, { encoding: "utf8" });
   var server = ldap.createServer({ certificate: ldapCert, key: ldapKey });
 } else {
   var server = ldap.createServer();
@@ -178,7 +178,7 @@ function getCsrfToken(site) {
     logDebug(site, "Got CSRF-Token.");
     return true;
   }).catch(function (error) {
-    logDebug(site, "Could not get CSRF-Token: "+ JSON.stringify(error));
+    logDebug(site, "Could not get CSRF-Token: " + JSON.stringify(error));
     return true; // continue anyway, maybe this is an older CT selfhosting version
   });
 }
@@ -231,11 +231,11 @@ function apiLogin(site) {
  * @param {boolean} [triedLogin] - Is true if this is the second attempt after API login
  */
 function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
-  logDebug(site, "Performing request to API function "+func);
+  logDebug(site, "Performing request to API function " + func);
   return rp({
     "method": "POST",
     "jar": site.cookieJar,
-    "headers": {'CSRF-Token': site.csrftoken},
+    "headers": { 'CSRF-Token': site.csrftoken },
     "uri": site.ct_uri + "?q=churchdb/ajax",
     "form": extend({ "func": func }, data || {}),
     "json": true
@@ -259,7 +259,7 @@ function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
   }, function (error) {
     if ((error.error.errors[0].message === "CSRF-Token is invalid") && !triedCSRFUpdate) {
       logDebug(site, "CSRF token is invalid, get new one and retry...");
-      return getCsrfToken(site).then(function() {
+      return getCsrfToken(site).then(function () {
         // Retry operation
         logDebug(site, "Retry request to API function " + func + " with fresh CSRF token");
         // Set "triedCSRFUpdate" parameter to prevent looping
@@ -305,7 +305,7 @@ function getCached(site, key, maxAge, factory) {
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function requestUsers (req, res, next) {
+function requestUsers(req, _res, next) {
   var site = req.site;
   req.usersPromise = getCached(site, USERS_KEY, config.cache_lifetime, function () {
     return apiPost(site, "getUsersData").then(function (results) {
@@ -366,7 +366,7 @@ function requestUsers (req, res, next) {
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function requestGroups (req, res, next) {
+function requestGroups(req, _res, next) {
   var site = req.site;
   req.groupsPromise = getCached(site, GROUPS_KEY, config.cache_lifetime, function () {
     return apiPost(site, "getGroupsData").then(function (results) {
@@ -401,7 +401,7 @@ function requestGroups (req, res, next) {
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function authorize(req, res, next) {
+function authorize(req, _res, next) {
   if (!req.connection.ldap.bindDN.equals(req.site.adminDn)) {
     logWarn(req.site, "Rejected search without proper binding!");
     return next(new ldap.InsufficientAccessRightsError());
@@ -415,7 +415,7 @@ function authorize(req, res, next) {
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function searchLogging (req, res, next) {
+function searchLogging(req, _res, next) {
   logDebug(req.site, "SEARCH base object: " + req.dn.toString() + " scope: " + req.scope);
   logDebug(req.site, "Filter: " + req.filter.toString());
   return next();
@@ -427,7 +427,7 @@ function searchLogging (req, res, next) {
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function sendUsers (req, res, next) {
+function sendUsers(req, res, next) {
   var strDn = req.dn.toString();
   req.usersPromise.then(function (users) {
     users.forEach(function (u) {
@@ -449,7 +449,7 @@ function sendUsers (req, res, next) {
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function sendGroups (req, res, next) {
+function sendGroups(req, res, next) {
   var strDn = req.dn.toString();
   req.groupsPromise.then(function (groups) {
     groups.forEach(function (g) {
@@ -471,7 +471,7 @@ function sendGroups (req, res, next) {
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function endSuccess (req, res, next) {
+function endSuccess(_req, res, next) {
   res.end();
   return next();
 }
@@ -482,7 +482,7 @@ function endSuccess (req, res, next) {
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function authenticate (req, res, next) {
+function authenticate(req, _res, next) {
   var site = req.site;
   if (req.dn.equals(site.adminDn)) {
     logDebug(site, "Admin bind DN: " + req.dn.toString());
@@ -514,47 +514,46 @@ function authenticate (req, res, next) {
   });
 }
 
-Object.keys(config.sites).map(function(sitename, index) {
+Object.keys(config.sites).map(function (sitename) {
   // Login bind for user
-  server.bind("ou=users,o=" + sitename, function (req, res, next) {
+  server.bind("ou=users,o=" + sitename, function (req, _res, next) {
     req.site = config.sites[sitename];
     next();
   }, authenticate, endSuccess);
 
   // Search implementation for user search
-  server.search("ou=users,o=" + sitename, function (req, res, next) {
+  server.search("ou=users,o=" + sitename, function (req, _res, next) {
     req.site = config.sites[sitename];
     next();
-  }, searchLogging, authorize, function (req, res, next) {
+  }, searchLogging, authorize, function (req, _res, next) {
     logDebug({ sitename: sitename }, "Search for users");
     req.checkAll = req.scope !== "base";
     return next();
   }, requestUsers, sendUsers, endSuccess);
 
   // Search implementation for group search
-  server.search("ou=groups,o=" + sitename, function (req, res, next) {
+  server.search("ou=groups,o=" + sitename, function (req, _res, next) {
     req.site = config.sites[sitename];
     next();
-  }, searchLogging, authorize, function (req, res, next) {
+  }, searchLogging, authorize, function (req, _res, next) {
     logDebug({ sitename: sitename }, "Search for groups");
     req.checkAll = req.scope !== "base";
     return next();
   }, requestGroups, sendGroups, endSuccess);
 
   // Search implementation for user and group search
-  server.search("o=" + sitename, function (req, res, next) {
+  server.search("o=" + sitename, function (req, _res, next) {
     req.site = config.sites[sitename];
     next();
-  }, searchLogging, authorize, function (req, res, next) {
+  }, searchLogging, authorize, function (req, _res, next) {
     logDebug({ sitename: sitename }, "Search for users and groups combined");
     req.checkAll = req.scope === "sub";
     return next();
   }, requestUsers, requestGroups, sendUsers, sendGroups, endSuccess);
-
 });
 
 // Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
-server.search('', function (req, res, next) {
+server.search('', function (req, res) {
   logDebug({ sitename: req.dn.o }, "empty request, return directory information");
   var obj = {
     "attributes": {

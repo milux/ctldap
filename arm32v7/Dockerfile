@@ -1,7 +1,7 @@
 # Build from parent directory with this command:
 # docker build -t milux/ctldap:arm32v7-latest -f ./arm32v7/Dockerfile .
 
-FROM arm32v7/node:latest
+FROM arm32v7/node:12-alpine
 LABEL maintainer="Michael Lux <michi.lux@gmail.com>"
 
 RUN mkdir /app && chown node:node /app
@@ -9,7 +9,7 @@ USER node
 WORKDIR /app
 
 COPY . .
-RUN npm install
+RUN yarn install
 
 EXPOSE 1389
 
