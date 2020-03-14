@@ -8,5 +8,6 @@ if [ "$SOURCE_BRANCH" = "master" ]; then
 else
     export FINAL_TAG="$SOURCE_BRANCH"
 fi
+envsubst < multi-arch-manifest.template.yaml > multi-arch-manifest.yaml
 
 ./manifest-tool push from-spec multi-arch-manifest.yaml
