@@ -1,4 +1,4 @@
-# LDAP Wrapper for ChurchTools v2.0
+# LDAP Wrapper for ChurchTools v2.2
 
 This software acts as an LDAP server for ChurchTools >= 3.25.0
 
@@ -30,7 +30,7 @@ It can be used to start/stop the service manually, but will not work correctly w
 Usage: ctldap.sh {start|stop|status|restart}
 
 ### If you don't have root privileges:
-- run `npm install` manually or otherwise trigger the installation of required dependencies
+- run `yarn install` or `npm install` manually or otherwise trigger the installation of required dependencies
 - copy "ctldap.example.config" to "ctldap.config" and adjust the required settings accordingly
 - register "ctldap.js" to be run by Node.js, or start the server directly by executing `node ctldap.js`
 

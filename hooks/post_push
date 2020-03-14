@@ -1,0 +1,13 @@
+#!/bin/bash
+
+curl -Lo manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.1/manifest-tool-linux-amd64
+chmod +x manifest-tool
+
+if [ "$SOURCE_BRANCH" = "master" ]; then
+    export FINAL_TAG="latest"
+else
+    export FINAL_TAG="$SOURCE_BRANCH"
+fi
+envsubst < multi-arch-manifest.template.yaml > multi-arch-manifest.yaml
+
+./manifest-tool push from-spec multi-arch-manifest.yaml
