@@ -27,6 +27,7 @@ CMD cp ctldap.example.config ctldap.config && \
     sed -i "s/^\(dn_lower_case\s*=\s*\).*\$/\1$IS_DN_LOWER_CASE/" ctldap.config && \
     sed -i "s/^\(ldap_user\s*=\s*\).*\$/\1$LDAP_USER/" ctldap.config && \
     sed -i "s/^\(ldap_password\s*=\s*\).*\$/\1$LDAP_PW/" ctldap.config && \
+    sed -i "s/^\(ldap_ip\s*=\s*\).*\$/\10.0.0.0/" ctldap.config && \
     sed -i "s/^\(ldap_port\s*=\s*\).*\$/\1$LDAP_PORT/" ctldap.config && \
     sed -i "s/^\(ldap_base_dn\s*=\s*\).*\$/\1$LDAP_BASE_DN/" ctldap.config && \
     sed -i "s#^\(ct_uri\s*=\s*\).*\$#\1$CT_URI#" ctldap.config && \
