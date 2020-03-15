@@ -1,6 +1,7 @@
 // ChurchTools LDAP-Wrapper 2.1
 // This tool requires a node.js-Server and ChurchTools >= 3.25.0
-// (c) 2017 Michael Lux
+// (c) 2017-2020 Michael Lux
+// (c) 2019-2020 Matthias Huber
 // (c) 2019 André Schild
 // License: GNU/GPL v3.0
 
