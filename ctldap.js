@@ -576,7 +576,10 @@ function escapeRegExp(str) {
   return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
 }
 
-/** Case insensitive search on substring filters */
+/** 
+ * Case insensitive search on substring filters
+ * Credits to @alansouzati, see https://github.com/ldapjs/node-ldapjs/issues/156
+ */
 ldap.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
   var tv = helpers.getAttrValue(target, this.attribute, strictAttrCase);
   if (tv !== undefined && tv !== null) {
