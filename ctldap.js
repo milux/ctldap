@@ -527,7 +527,7 @@ Object.keys(config.sites).map(function (sitename) {
     next();
   }, searchLogging, authorize, function (req, _res, next) {
     logDebug({ sitename: sitename }, "Search for users");
-    req.checkAll = req.scope !== "base";
+    req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
     return next();
   }, requestUsers, sendUsers, endSuccess);
 
@@ -537,7 +537,7 @@ Object.keys(config.sites).map(function (sitename) {
     next();
   }, searchLogging, authorize, function (req, _res, next) {
     logDebug({ sitename: sitename }, "Search for groups");
-    req.checkAll = req.scope !== "base";
+    req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
     return next();
   }, requestGroups, sendGroups, endSuccess);
 
