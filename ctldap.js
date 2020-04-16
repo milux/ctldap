@@ -113,16 +113,21 @@ Object.keys(config.sites).map(function(sitename, index) {
           site.loginErrorCount = 0;
         }
       }
-      var hash = site.ldap_password.replace(/^\$2y(.+)$/i, '$2a$1');
-      bcrypt.compare(password, hash, function(err, valid) {
-        if (!valid) {
-          site.loginErrorCount += 1;
-          if (site.loginErrorCount > 5) {
-            site.loginBlockedDate = new Date();
+      var directCheckValid = (password === site.ldap_password);
+      if (directCheckValid) {
+        callback(true);
+      } else {
+        var hash = site.ldap_password.replace(/^\$2y(.+)$/i, '$2a$1');
+        bcrypt.compare(password, hash, function (err, valid) {
+          if (!valid) {
+            site.loginErrorCount += 1;
+            if (site.loginErrorCount > 5) {
+              site.loginBlockedDate = new Date();
+            }
           }
-        }
-        callback(valid);
-      });
+          callback(valid);
+        });
+      }
     }
   } else {
     site.checkPassword = function (password, callback) {
