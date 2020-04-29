@@ -1,6 +1,7 @@
 // ChurchTools LDAP-Wrapper 2.1
 // This tool requires a node.js-Server and ChurchTools >= 3.25.0
-// (c) 2017 Michael Lux
+// (c) 2017-2020 Michael Lux
+// (c) 2019-2020 Matthias Huber
 // (c) 2019 André Schild
 // License: GNU/GPL v3.0
 
@@ -31,7 +32,9 @@ function logWarn(site, msg) {
 
 function logError(site, msg, error) {
   console.log("[ERROR] " + site.sitename + " - " + msg);
-  console.log(error.stack);
+  if (error !== undefined) {
+    console.log(error.stack);
+  }
 }
 
 if (config.debug) {
@@ -251,7 +254,7 @@ function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
           return apiPost(site, func, data, true, triedCSRFUpdate);
         });
       } else {
-        logError(site, "CT API request still not working after login:");
+        logError(site, "CT API request still not working after login.");
         throw new Error(JSON.stringify(result));
       }
     }
@@ -527,7 +530,7 @@ Object.keys(config.sites).map(function (sitename) {
     next();
   }, searchLogging, authorize, function (req, _res, next) {
     logDebug({ sitename: sitename }, "Search for users");
-    req.checkAll = req.scope !== "base";
+    req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
     return next();
   }, requestUsers, sendUsers, endSuccess);
 
@@ -537,7 +540,7 @@ Object.keys(config.sites).map(function (sitename) {
     next();
   }, searchLogging, authorize, function (req, _res, next) {
     logDebug({ sitename: sitename }, "Search for groups");
-    req.checkAll = req.scope !== "base";
+    req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
     return next();
   }, requestGroups, sendGroups, endSuccess);
 
@@ -576,7 +579,10 @@ function escapeRegExp(str) {
   return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
 }
 
-/** Case insensitive search on substring filters */
+/** 
+ * Case insensitive search on substring filters
+ * Credits to @alansouzati, see https://github.com/ldapjs/node-ldapjs/issues/156
+ */
 ldap.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
   var tv = helpers.getAttrValue(target, this.attribute, strictAttrCase);
   if (tv !== undefined && tv !== null) {
