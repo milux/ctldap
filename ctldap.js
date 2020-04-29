@@ -32,7 +32,9 @@ function logWarn(site, msg) {
 
 function logError(site, msg, error) {
   console.log("[ERROR] " + site.sitename + " - " + msg);
-  console.log(error.stack);
+  if (error !== undefined) {
+    console.log(error.stack);
+  }
 }
 
 if (config.debug) {
@@ -252,7 +254,7 @@ function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
           return apiPost(site, func, data, true, triedCSRFUpdate);
         });
       } else {
-        logError(site, "CT API request still not working after login:");
+        logError(site, "CT API request still not working after login.");
         throw new Error(JSON.stringify(result));
       }
     }
