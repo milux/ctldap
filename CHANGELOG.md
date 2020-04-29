@@ -1,5 +1,9 @@
 # Changelog
 
+### 2.2.2
+- Fixed recursion bug (GitHub issue #3)
+- Logging Bugfix
+
 ### 2.2.1
 - Silent release, only minor build process fix
 
