@@ -258,7 +258,7 @@ function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
           return apiPost(site, func, data, true, triedCSRFUpdate);
         });
       } else {
-        var error = new Error(JSON.stringify(result);
+        var error = new Error(JSON.stringify(result));
         logError(site, "CT API request still not working after login: ", error);
         throw error;
       }
