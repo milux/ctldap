@@ -31,7 +31,9 @@ function logWarn(site, msg) {
 
 function logError(site, msg, error) {
   console.log("[ERROR] "+site.sitename+" - "+msg);
-  console.log(error.stack);
+  if (error) {
+    console.log(error);
+  }
 }
 
 if (config.debug) {
@@ -256,8 +258,9 @@ function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
           return apiPost(site, func, data, true, triedCSRFUpdate);
         });
       } else {
-        logError(site, "CT API request still not working after login:");
-        throw new Error(JSON.stringify(result));
+        var error = new Error(JSON.stringify(result);
+        logError(site, "CT API request still not working after login: ", error);
+        throw error;
       }
     }
     return result.data;
@@ -505,7 +508,7 @@ function authenticate (req, res, next) {
       return;
     }
   } else {
-    logDebug(site, "Bind user DN: %s", req.dn);
+    logDebug(site, "Bind user DN: " + req.dn);
   }
   apiPost(site, "authenticate", {
     "user": req.dn.rdns[0].attrs.cn.value,
