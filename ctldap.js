@@ -265,7 +265,7 @@ function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
     }
     return result.data;
   }, function (error) {
-    if ((error.error.errors[0].message === "CSRF-Token is invalid") && !triedCSRFUpdate) {
+    if ((error.error && error.error.errors && error.error.errors[0] && error.error.errors[0].message === "CSRF-Token is invalid") && !triedCSRFUpdate) {
       logDebug(site, "CSRF token is invalid, get new one and retry...");
       return getCsrfToken(site).then(function() {
         // Retry operation
