@@ -223,6 +223,12 @@ function apiLogin(site) {
       site.loginPromise = null;
       // end gracefully
       return null;
+    }).catch(function (error) {
+      logDebug(site, "CT API login failed with exception.");
+      // clear login promise
+      site.loginPromise = null;
+      // rethrow error
+      throw error;
     });
   } else if (config.debug) {
     logDebug(site, "Return pending login promise");
