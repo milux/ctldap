@@ -400,7 +400,8 @@ function requestGroups (req, res, next) {
             objectclass: ["group", "CTGroup" + groupType.charAt(0).toUpperCase() + groupType.slice(1)],
             uniquemember: (results.groupMembers[v.id] || []).map(function (cn) {
               return site.compatTransform(site.fnUserDn({ cn: cn }));
-            })
+            }),
+            memberUID: results.groupMembers[v.id] || []
           }
         };
       });
