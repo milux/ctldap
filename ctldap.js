@@ -15,6 +15,8 @@ var Promise = require("bluebird");
 var path = require('path');
 var bcrypt = require('bcrypt');
 
+var userAgent = 'CTLDAP-MS';
+
 var helpers = require('ldap-filter/lib/helpers');
 
 var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
@@ -176,7 +178,10 @@ function getCsrfToken(site) {
     "method": "GET",
     "jar": site.cookieJar,
     "uri": site.ct_uri + "/api/csrftoken",
-    "json": true
+    "json": true,
+    headers: {
+      'User-Agent': userAgent
+    },
   }).then(function (result) {
     if (!result.data) {
       throw new Error(JSON.stringify(result));
@@ -207,7 +212,10 @@ function apiLogin(site) {
         "email": site.api_user,
         "password": site.api_password
       },
-      "json": true
+      "json": true,
+      headers: {
+        'User-Agent': userAgent
+      },
     }).then(function (result) {
       if (result.status !== "success") {
         logDebug(site, "CT API login failed: " + JSON.stringify(result));
@@ -248,7 +256,7 @@ function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
   return rp({
     "method": "POST",
     "jar": site.cookieJar,
-    "headers": {'CSRF-Token': site.csrftoken},
+    "headers": {'CSRF-Token': site.csrftoken, 'User-Agent': userAgent},
     "uri": site.ct_uri + "?q=churchdb/ajax",
     "form": extend({ "func": func }, data || {}),
     "json": true
