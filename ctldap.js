@@ -21,6 +21,8 @@ var helpers = require('ldap-filter/lib/helpers');
 
 var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
 
+var rateLimitStore = {};
+
 function logDebug(site, msg) {
   if (config.debug) {
     console.log("[DEBUG] "+site.sitename+" - "+msg);
@@ -244,6 +246,33 @@ function apiLogin(site) {
   return site.loginPromise;
 }
 
+function checkRateLimit(site, windowInSeconds, maxRequests) {
+  sitename = site.sitename;
+  var now = new Date();
+  if (!rateLimitStore[windowInSeconds]) {
+    rateLimitStore[windowInSeconds] = {};
+  }
+  if (!rateLimitStore[windowInSeconds][sitename]) {
+    rateLimitStore[windowInSeconds][sitename] = {
+      windowStartTime: now,
+      requestCount: 0
+    };
+  }
+
+  var secondsBetweenStartOfWindowAndNow = (now.getTime() - rateLimitStore[windowInSeconds][sitename].windowStartTime.getTime()) / 1000;
+  if (secondsBetweenStartOfWindowAndNow > windowInSeconds) {
+    rateLimitStore[windowInSeconds][sitename] = {
+      windowStartTime: now,
+      requestCount: 0
+    };
+  }
+  if (rateLimitStore[windowInSeconds][sitename].requestCount > maxRequests) {
+    logError('Rate Limit reached');
+    throw new Error('Rate Limit reached');
+  }
+  rateLimitStore[windowInSeconds][sitename].requestCount++;
+}
+
 /**
  * Retrieves data from the PHP API via a POST call.
  * @param {object} site - The current site
@@ -253,6 +282,8 @@ function apiLogin(site) {
  */
 function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
   logDebug(site, "Performing request to API function "+func);
+  checkRateLimit(site, 60 * 10, site.requests10Minutes? site.requests10Minutes: 100);
+  checkRateLimit(site, 60 * 60, site.requests60Minutes? site.requests60Minutes: 200);
   return rp({
     "method": "POST",
     "jar": site.cookieJar,
