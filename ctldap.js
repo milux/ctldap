@@ -1,364 +1,370 @@
-// ChurchTools LDAP-Wrapper 2.1
-// This tool requires a node.js-Server and ChurchTools >= 3.25.0
-// (c) 2017-2020 Michael Lux
+// ctldap - ChurchTools LDAP-Wrapper 3.0
+// This tool requires a node.js-Server and a recent version of ChurchTools 3
+// (c) 2017-2023 Michael Lux
 // (c) 2019-2020 Matthias Huber
 // (c) 2019 André Schild
 // License: GNU/GPL v3.0
 
-var ldap = require('ldapjs');
-var fs = require('fs');
-var ini = require('ini');
-var rp = require('request-promise');
-var ldapEsc = require('ldap-escape');
-var parseDN = require('ldapjs').parseDN;
-var extend = require('extend');
-var Promise = require("bluebird");
-var path = require('path');
-var bcrypt = require('bcrypt');
+import got from 'got';
+import helpers from "ldap-filter";
+import bcrypt from "bcrypt";
+import argon2 from "argon2";
+import ldapEsc from "ldap-escape";
+import fs from "fs";
+import ldap from "ldapjs";
+import { readYamlEnvSync } from 'yaml-env-defaults';
 
-var helpers = require('ldap-filter/lib/helpers');
+const parseDN = ldap.parseDN;
+const yaml = readYamlEnvSync('./ctldap.yml');
+const config = yaml.config;
+const sites = yaml.sites || {};
 
-var config = ini.parse(fs.readFileSync(path.resolve(__dirname, 'ctldap.config'), 'utf-8'));
+function getIsoDate() {
+  return new Date().toISOString();
+}
 
 function logDebug(site, msg) {
   if (config.debug) {
-    console.log("[DEBUG] " + site.sitename + " - " + msg);
+    console.log(`${getIsoDate()} [DEBUG] ${site.siteName} - ${msg}`);
   }
 }
 
 function logWarn(site, msg) {
-  console.log("[WARN] " + site.sitename + " - " + msg);
+  console.warn(`${getIsoDate()} [WARN]  ${site.siteName} - ${msg}`);
 }
 
 function logError(site, msg, error) {
-  console.log("[ERROR] " + site.sitename + " - " + msg);
+  console.error(`${getIsoDate()} [ERROR] ${site.siteName} - ${msg}`);
   if (error !== undefined) {
-    console.log(error.stack);
+    console.error(error.stack);
   }
 }
 
-if (config.debug) {
-  console.log("Debug mode enabled, expect lots of output!");
+logDebug({ siteName: 'root logger' }, "Debug mode enabled, expect lots of output!");
+
+if (typeof config.cacheLifetime !== 'number' && isNaN(config.cacheLifetime)) {
+  config.cacheLifetime = 300000;  // 5 minutes
 }
 
 // If no sites are configured, create one from the global config properties
-if (config.ldap_base_dn) {
-  if (!config.sites) {
-    config.sites = {};
-  }
-  config.sites[config.ldap_base_dn] = {
-    sitename: config.ldap_base_dn,
-    ldap_password: config.ldap_password,
-    ct_uri: config.ct_uri,
-    api_user: config.api_user,
-    api_password: config.api_password
+if (config.ldapBaseDn) {
+  sites[config.ldapBaseDn] = {
+    siteName: config.ldapBaseDn,
+    ldapPassword: config.ldapPassword,
+    ctUri: config.ctUri,
+    apiToken: config.apiToken,
+    specialGroupMappings: config.specialGroupMappings
   }
 }
 
-Object.keys(config.sites).map(function (sitename) {
-  var site = config.sites[sitename];
+Object.keys(sites).map((siteName) => {
+  const site = sites[siteName];
 
-  site.sitename = sitename;
-  site.fnUserDn = ldapEsc.dn("cn=${cn},ou=users,o=" + sitename);
-  site.fnGroupDn = ldapEsc.dn("cn=${cn},ou=groups,o=" + sitename);
-  site.cookieJar = rp.jar();
-  site.loginPromise = null;
-  site.adminDn = site.fnUserDn({ cn: config.ldap_user });
+  site.siteName = siteName;
+  site.fnUserDn = ldapEsc.dn("cn=${cn},ou=users,o=" + siteName);
+  site.fnGroupDn = ldapEsc.dn("cn=${cn},ou=groups,o=" + siteName);
+  site.api = got.extend({
+    headers: { "Authorization": `Login ${site.apiToken}` },
+    prefixUrl: `${site.ctUri.replace(/\/$/g, '')}/api`,
+    responseType: 'json',
+    resolveBodyOnly: true,
+    http2: true
+  });
+  site.adminDn = site.fnUserDn({ cn: config.ldapUser });
   site.CACHE = {};
   site.loginErrorCount = 0;
   site.loginBlockedDate = null;
 
-  if (site.dn_lower_case || ((site.dn_lower_case === undefined) && config.dn_lower_case)) {
-    site.compatTransform = function (s) {
-      return typeof s === "string" ? s.toLowerCase() : s;
-    };
+  const identityFn = (p) => p;
+  const stringLowerFn = (s) => typeof s === "string" ? s.toLowerCase() : s;
+
+  if (site.dnLowerCase || ((site.dnLowerCase === undefined) && config.dnLowerCase)) {
+    site.compatTransform = stringLowerFn;
   } else {
-    site.compatTransform = function (s) {
-      return s;
-    };
+    site.compatTransform = identityFn;
   }
-  if (site.email_lower_case || ((site.email_lower_case === undefined) && config.email_lower_case)) {
-    site.compatTransformEmail = function (s) {
-      return typeof s === "string" ? s.toLowerCase() : s;
-    };
+
+  if (site.emailLowerCase || ((site.emailLowerCase === undefined) && config.emailLowerCase)) {
+    site.compatTransformEmail = stringLowerFn;
   } else {
-    site.compatTransformEmail = function (s) {
-      return s;
-    };
+    site.compatTransformEmail = identityFn;
   }
-  if (site.emails_unique || ((site.emails_unique === undefined) && config.emails_unique)) {
-    site.uniqueEmails = function (users) {
-      var mails = {};
-      return users.filter(function (user) {
+
+  if (site.emailsUnique || ((site.emailsUnique === undefined) && config.emailsUnique)) {
+    site.uniqueEmails = (users) => {
+      const mails = {};
+      return users.filter((user) => {
         if (!user.attributes.email) {
           return false;
         }
-        var result = !(user.attributes.email in mails);
+        const result = !(user.attributes.email in mails);
         mails[user.attributes.email] = true;
         return result;
       });
     };
   } else {
-    site.uniqueEmails = function (users) {
-      return users;
-    };
+    site.uniqueEmails = identityFn;
   }
-  if (site.ldap_password_bcrypt || ((site.ldap_password_bcrypt === undefined) && config.ldap_password_bcrypt)) {
-    site.checkPassword = function (password, callback) {
-      if (site.loginBlockedDate) {
-        var now = new Date();
-        var checkDate = new Date(site.loginBlockedDate.getTime() + 1000 * 3600 * 24); // one day
-        if (now < checkDate) {
-          callback(false);
-          return;
-        } else {
-          site.loginBlockedDate = null;
-          site.loginErrorCount = 0;
-        }
+
+  site.authenticateAdmin = async (password) => {
+    if (site.loginBlockedDate) {
+      const now = new Date();
+      const checkDate = new Date(site.loginBlockedDate.getTime() + 1000 * 3600 * 24); // one day
+      if (now < checkDate) {
+        throw Error("Login blocked!");
+      } else {
+        site.loginBlockedDate = null;
+        site.loginErrorCount = 0;
       }
-      var hash = site.ldap_password.replace(/^\$2y(.+)$/i, '$2a$1');
-      bcrypt.compare(password, hash, function (_err, valid) {
-        if (!valid) {
-          site.loginErrorCount += 1;
-          if (site.loginErrorCount > 5) {
-            site.loginBlockedDate = new Date();
-          }
-        }
-        callback(valid);
-      });
     }
-  } else {
-    site.checkPassword = function (password, callback) {
-      if (site.loginBlockedDate) {
-        var now = new Date();
-        var checkDate = new Date(site.loginBlockedDate.getTime() + 1000 * 3600 * 24); // one day
-        if (now < checkDate) {
-          callback(false);
-          return;
-        } else {
-          site.loginBlockedDate = null;
-          site.loginErrorCount = 0;
-        }
+    try {
+      await site.checkPassword(password);
+    } catch (error) {
+      site.loginErrorCount += 1;
+      if (site.loginErrorCount > 5) {
+        site.loginBlockedDate = new Date();
       }
-      var valid = (password === site.ldap_password);
-      if (!valid) {
-        site.loginErrorCount += 1;
-        if (site.loginErrorCount > 5) {
-          site.loginBlockedDate = new Date();
-        }
-      }
-      callback(valid);
+      throw error;
     }
-  }
-  if (site.ct_uri.slice(-1) !== "/") {
-    site.ct_uri += "/";
+  };
+
+  // If LDAP admin password has been provided, set the right verification algorithm based on hash format.
+  if (site.ldapPassword) {
+    if (/^\$2[yab]\$/.test(site.ldapPassword)) {
+      // Assume bcrypt hash
+      site.checkPassword = async (password) => {
+        const hash = site.ldapPassword.replace(/^\$2y\$/, '$2a$');
+        if (!await bcrypt.compare(password, hash)) {
+          throw Error("Wrong password, bcrypt hash didn't match!");
+        }
+      };
+    } else if (/^\$argon2[id]{1,2}\$/.test(site.ldapPassword)) {
+      // Assume argon2 hash
+      site.checkPassword = async (password) => {
+        if (!await argon2.verify(site.ldapPassword, password)) {
+          throw Error("Wrong password, argon2 hash didn't match!");
+        }
+      }
+    } else {
+      // Assume plaintext password
+      site.checkPassword = async (password) => {
+        if (password !== site.ldapPassword) {
+          throw Error("Wrong password, plaintext didn't match!")
+        }
+      };
+    }
   }
 });
 
-if (config.ldap_cert_filename && config.ldap_key_filename) {
-  var ldapCert = fs.readFileSync(config.ldap_cert_filename, { encoding: "utf8" }),
-    ldapKey = fs.readFileSync(config.ldap_key_filename, { encoding: "utf8" });
-  var server = ldap.createServer({ certificate: ldapCert, key: ldapKey });
-} else {
-  var server = ldap.createServer();
+let options = {};
+if (config.ldapCertFilename && config.ldapKeyFilename) {
+  const ldapCert = fs.readFileSync(new URL(`./${config.ldapCertFilename}`, import.meta.url), { encoding: "utf8" }),
+      ldapKey = fs.readFileSync(new URL(`./${config.ldapKeyFilename}`, import.meta.url), { encoding: "utf8" });
+  options = { certificate: ldapCert, key: ldapKey };
 }
+const server = ldap.createServer();
 
-if (typeof config.cache_lifetime !== 'number') {
-  config.cache_lifetime = 10000;  // 10 seconds
-}
-
-function getCsrfToken(site) {
-  return rp({
-    "method": "GET",
-    "jar": site.cookieJar,
-    "uri": site.ct_uri + "/api/csrftoken",
-    "json": true
-  }).then(function (result) {
-    if (!result.data) {
-      throw new Error(JSON.stringify(result));
-    }
-    site.csrftoken = result.data;
-    logDebug(site, "Got CSRF-Token.");
-    return true;
-  }).catch(function (error) {
-    logDebug(site, "Could not get CSRF-Token: " + JSON.stringify(error));
-    return true; // continue anyway, maybe this is an older CT selfhosting version
-  });
-}
+const USERS_KEY = 'users', GROUPS_KEY = 'groups', RAW_DATA_KEY = 'rawData';
 
 /**
- * Returns a promise for the login on the ChurchTools API.
- * If a pending login promise already exists, it is returned right away.
- */
-function apiLogin(site) {
-  if (site.loginPromise === null) {
-    logDebug(site, "Performing CT API login...");
-    site.csrftoken = 'foobar';
-    site.loginPromise = rp({
-      "method": "POST",
-      "jar": site.cookieJar,
-      "uri": site.ct_uri + "?q=login/ajax",
-      "form": {
-        "func": "login",
-        "email": site.api_user,
-        "password": site.api_password
-      },
-      "json": true
-    }).then(function (result) {
-      if (result.status !== "success") {
-        logDebug(site, "CT API login failed: " + JSON.stringify(result));
-        // clear login promise
-        site.loginPromise = null;
-        throw new Error(JSON.stringify(result));
-      }
-      logDebug(site, "CT API login successful, fetching CSRF-Token...");
-      return getCsrfToken(site);
-    }).then(function () {
-      logDebug(site, "CT API login completed");
-      // clear login promise
-      site.loginPromise = null;
-      // end gracefully
-      return null;
-    });
-  } else if (config.debug) {
-    logDebug(site, "Return pending login promise");
-  }
-  return site.loginPromise;
-}
-
-/**
- * Retrieves data from the PHP API via a POST call.
- * @param {object} site - The current site
- * @param {function} func - The function to call in the API class
- * @param {object} [data] - The optional form data to pass along with the POST request
- * @param {boolean} [triedLogin] - Is true if this is the second attempt after API login
- */
-function apiPost(site, func, data, triedLogin, triedCSRFUpdate) {
-  logDebug(site, "Performing request to API function " + func);
-  return rp({
-    "method": "POST",
-    "jar": site.cookieJar,
-    "headers": { 'CSRF-Token': site.csrftoken },
-    "uri": site.ct_uri + "?q=churchdb/ajax",
-    "form": extend({ "func": func }, data || {}),
-    "json": true
-  }).then(function (result) {
-    if (result.status !== "success") {
-      // If this was the first attempt, login and try again
-      if (!triedLogin) {
-        logDebug(site, "CT session invalid, login and retry...");
-        return apiLogin(site).then(function () {
-          // Retry operation after login
-          logDebug(site, "Retry request to API function " + func + " after login");
-          // Set "triedLogin" parameter to prevent looping
-          return apiPost(site, func, data, true, triedCSRFUpdate);
-        });
-      } else {
-        logError(site, "CT API request still not working after login.");
-        throw new Error(JSON.stringify(result));
-      }
-    }
-    return result.data;
-  }, function (error) {
-    if ((error.error.errors[0].message === "CSRF-Token is invalid") && !triedCSRFUpdate) {
-      logDebug(site, "CSRF token is invalid, get new one and retry...");
-      return getCsrfToken(site).then(function () {
-        // Retry operation
-        logDebug(site, "Retry request to API function " + func + " with fresh CSRF token");
-        // Set "triedCSRFUpdate" parameter to prevent looping
-        return apiPost(site, func, data, triedLogin, true);
-      });
-    }
-    throw error;
-  });
-}
-
-var USERS_KEY = "users", GROUPS_KEY = "groups";
-
-/**
- * Retrieves data from cache as a Promise or refreshes the data with the provided Promise factory.
+ * Retrieves data from cache as a Promise or refreshes the data with the provided (async) factory.
+ * @param {object} site - The site for which to query the cache
  * @param {string} key - The cache key
- * @param {number} maxAge - The maximum age of the cache entry, if older the data will be refreshed
  * @param {function} factory - A function returning a Promise that resolves with the new cache entry or rejects
  */
-function getCached(site, key, maxAge, factory) {
-  return new Promise(function (resolve, reject) {
-    var time = new Date().getTime();
-    var co = site.CACHE[key] || { time: -1, entry: null };
-    if (time - maxAge < co.time) {
-      logDebug(site, "using cached data");
+function getCached(site, key, factory) {
+  const cache = site.CACHE;
+  const co = cache[key] || { time: -1, entry: null };
+  const promise = new Promise((resolve, reject) => {
+    const time = new Date().getTime();
+    if (time - config.cacheLifetime < co.time) {
+      logDebug(site, `Returning cached data for key "${key}".`);
       resolve(co.entry);
     } else {
-      // Call the factory() function to retrieve the Promise for the fresh entry
-      // Either resolve with the new entry (plus cache update), or pass on the rejection
-      factory().then(function (result) {
-        co.entry = result;
-        co.time = new Date().getTime();
-        site.CACHE[key] = co;
-        resolve(result);
-      }, reject);
+      if (co.promise) {
+        logDebug(site, `Returning pending Promise for cache key "${key}".`);
+      } else {
+        // Call the factory() function to retrieve the Promise for the fresh entry
+        // Either resolve with the new entry (plus cache update), or pass on the rejection
+        co.promise = factory().then((result) => {
+          logDebug(site, `Store cache entry for cache key "${key}".`)
+          co.entry = result;
+          co.time = new Date().getTime();
+          return result;
+        }).finally(() => {
+          delete co.promise;
+        });
+      }
+      // Wait until promise resolves
+      logDebug(site, `Wait on Promise for cache key "${key}".`)
+      co.promise.then(resolve, reject);
     }
   });
+  cache[key] = co;
+  return promise;
 }
 
+async function fetchAllPaginatedHack(site, apiPath, searchParams) {
+  // Get all records except the last one
+  const result = await site.api.get(apiPath, {
+    searchParams: {
+      ...searchParams,
+      limit: -1
+    }
+  });
+  const data = result['data'];
+  const total = result['meta']['pagination']['total'];
+  if (data.length < total) {
+    // Fetch last record and append it to the result
+    const limit = total - data.length;
+    const last = await site.api.get(apiPath, {
+      searchParams: {
+        ...searchParams,
+        limit,
+        page: Math.ceil(total / limit)
+      }
+    });
+    data.push(last['data'][0]);
+  }
+  return data;
+}
+
+async function fetchMemberships(site) {
+  const result = await site.api.get('groups/members', {
+    searchParams: {"with_deleted": false}
+  });
+  logDebug(site, "fetchMemberships done");
+  return result['data'];
+}
+
+async function fetchPersons(site) {
+  const data = await fetchAllPaginatedHack(site, 'persons');
+  logDebug(site, "fetchPersons done");
+  const personMap = {};
+  data.forEach((p) => {
+    if (p['invitationStatus'] === "accepted") {
+      personMap[p['id']] = p;
+      p.dn = site.compatTransform(site.fnUserDn({cn: p['cmsUserId']}));
+    }
+  });
+  return personMap;
+}
+
+async function fetchGroups(site) {
+  const data = await fetchAllPaginatedHack(site, 'groups');
+  logDebug(site, "fetchGroups done");
+  const groupMap = {};
+  const sgmKeys = Object.keys(site.specialGroupMappings);
+  data.forEach((g) => {
+    const info = g['information'];
+    g.specialClasses = sgmKeys.filter((k) => info[k])
+    // Strip some irrelevant information
+    delete g['settings'];
+    delete g['roles'];
+    groupMap[g['id']] = g;
+    g.dn = site.compatTransform(site.fnGroupDn({cn: g['name']}));
+  });
+  return groupMap;
+}
+
+async function fetchGroupTypes(site) {
+  const result = await site.api.get('person/masterdata');
+  logDebug(site, "fetchGroupTypes done");
+  const groupTypes = {};
+  result['data']['groupTypes'].forEach((gt) => groupTypes[gt['id']] = gt['name']);
+  return groupTypes;
+}
+
+async function fetchAll(site) {
+  return await getCached(site, RAW_DATA_KEY, async () => {
+    const [personMap, groupMap, memberships, groupTypes] = await Promise.all([
+      fetchPersons(site), fetchGroups(site), fetchMemberships(site), fetchGroupTypes(site)
+    ]);
+    // Create membership mappings
+    const g2p = {}, p2g = {};
+    memberships.forEach((m) => {
+      const { personId, groupId } = m;
+      // Only map persons/groups that have not been filtered
+      if ((personId in personMap) && (groupId in groupMap)) {
+        // Entry for group-to-persons-mappings
+        if (!g2p[groupId]) {
+          g2p[groupId] = [personId];
+        } else {
+          g2p[groupId].push(personId);
+        }
+        // Entry for person-to-groups-mappings
+        if (!p2g[personId]) {
+          p2g[personId] = [groupId];
+        } else {
+          p2g[personId].push(groupId);
+        }
+      }
+    });
+    return { groupTypes, g2p, p2g, personMap, groupMap };
+  });
+}
 
 /**
  * Retrieves the users for the processed request as a Promise.
  * @param {object} req - Request object
- * @param {object} res - Response object
+ * @param {object} _res - Response object
  * @param {function} next - Next handler function of filter chain
  */
 function requestUsers(req, _res, next) {
-  var site = req.site;
-  req.usersPromise = getCached(site, USERS_KEY, config.cache_lifetime, function () {
-    return apiPost(site, "getUsersData").then(function (results) {
-      var newCache = results.users.map(function (v) {
-        var cn = v.cmsuserid;
-        return {
-          dn: site.compatTransform(site.fnUserDn({ cn: cn })),
-          attributes: {
-            cn: cn,
-            displayname: v.vorname + " " + v.name,
-            id: String(v.id),
-            uid: cn,
-            nsuniqueid: "u" + v.id,
-            givenname: v.vorname,
-            street: v.strasse,
-            telephoneMobile: v.telefonhandy,
-            telephoneHome: v.telefonprivat,
-            postalCode: v.plz,
-            l: v.ort,
-            sn: v.name,
-            email: site.compatTransformEmail(v.email),
-            mail: site.compatTransformEmail(v.email),
-            objectclass: ['CTPerson'],
-            memberof: (results.userGroups[v.id] || []).map(function (cn) {
-              return site.compatTransform(site.fnGroupDn({ cn: cn }));
-            })
-          }
-        };
-      });
-      newCache = site.uniqueEmails(newCache);
-      // Virtual admin user
-      if (site.ldap_password !== undefined) {
-        var cn = config.ldap_user;
-        newCache.push({
-          dn: site.compatTransform(site.fnUserDn({ cn: cn })),
-          attributes: {
-            cn: cn,
-            displayname: "LDAP Administrator",
-            id: 0,
-            uid: cn,
-            nsuniqueid: "u0",
-            givenname: "LDAP Administrator",
-            objectclass: ['CTPerson'],
-          }
-        });
-      }
-      var size = newCache.length;
-      logDebug(site, "Updated users: " + size);
-      return newCache;
+  const site = req.site;
+  req.usersPromise = getCached(site, USERS_KEY, async () => {
+    const { p2g, personMap, groupMap } = await fetchAll(site);
+    let newCache = Object.entries(personMap).map(([id, p]) => {
+      const cn = p['cmsUserId'];
+      const email = site.compatTransformEmail(p['email']);
+      return {
+        dn: p.dn,
+        attributes: {
+          cn,
+          displayname: `${p['firstName']} ${p['lastName']}`,
+          id,
+          uid: cn,
+          nsuniqueid: `u${id}`,
+          givenname: p['firstName'],
+          street: p['street'],
+          telephoneMobile: p['mobile'],
+          telephoneHome: p['phonePrivate'],
+          postalCode: p['zip'],
+          l: p['city'],
+          sn: p['lastName'],
+          email,
+          mail: email,
+          objectclass: [
+            'person',
+            'CTPerson',
+            ...(p2g[id] || [])
+                .flatMap((gid) => groupMap[gid].specialClasses)
+                .map((key) => site.specialGroupMappings[key]['personClass'])
+          ],
+          memberof: (p2g[id] || []).map((gid) => groupMap[gid].dn)
+        }
+      };
     });
+    newCache = site.uniqueEmails(newCache);
+    // Virtual admin user
+    if (site.ldapPassword !== undefined) {
+      const cn = config.ldapUser;
+      newCache.push({
+        dn: site.compatTransform(site.fnUserDn({ cn: cn })),
+        attributes: {
+          cn,
+          displayname: "LDAP Administrator",
+          id: 0,
+          uid: cn,
+          nsuniqueid: "u0",
+          givenname: "LDAP Administrator",
+          objectclass: ['person'],
+        }
+      });
+    }
+    const size = newCache.length;
+    logDebug(site, "Updated users: " + size);
+    return newCache;
   });
   return next();
 }
@@ -366,34 +372,34 @@ function requestUsers(req, _res, next) {
 /**
  * Retrieves the groups for the processed request as a Promise.
  * @param {object} req - Request object
- * @param {object} res - Response object
+ * @param {object} _res - Response object
  * @param {function} next - Next handler function of filter chain
  */
 function requestGroups(req, _res, next) {
-  var site = req.site;
-  req.groupsPromise = getCached(site, GROUPS_KEY, config.cache_lifetime, function () {
-    return apiPost(site, "getGroupsData").then(function (results) {
-      var newCache = results.groups.map(function (v) {
-        var cn = v.bezeichnung;
-        var groupType = v.gruppentyp;
-        return {
-          dn: site.compatTransform(site.fnGroupDn({ cn: cn })),
-          attributes: {
-            cn: cn,
-            displayname: v.bezeichnung,
-            id: v.id,
-            nsuniqueid: "g" + v.id,
-            objectclass: ["group", "CTGroup" + groupType.charAt(0).toUpperCase() + groupType.slice(1)],
-            uniquemember: (results.groupMembers[v.id] || []).map(function (cn) {
-              return site.compatTransform(site.fnUserDn({ cn: cn }));
-            })
-          }
-        };
-      });
-      var size = newCache.length;
-      logDebug(site, "Updated groups: " + size);
-      return newCache;
+  const site = req.site;
+  req.groupsPromise = getCached(site, GROUPS_KEY, async () => {
+    const { groupTypes, g2p, personMap, groupMap } = await fetchAll(site);
+    const newCache = Object.entries(groupMap).map(([id, g]) => {
+      const cn = g['name'];
+      const info = g['information'];
+      const groupType = groupTypes[info['groupTypeId']];
+      const objectClasses = ["group", "CTGroup" + groupType.charAt(0).toUpperCase() + groupType.slice(1),
+        ...g.specialClasses.map((key) => site.specialGroupMappings[key]['groupClass'])];
+      return {
+        dn: g.dn,
+        attributes: {
+          cn,
+          displayname: g['name'],
+          id,
+          nsuniqueid: `g${id}`,
+          objectclass: objectClasses,
+          uniquemember: (g2p[id] || []).map((pid) => personMap[pid].dn)
+        }
+      };
     });
+    const size = newCache.length;
+    logDebug(site, "Updated groups: " + size);
+    return newCache;
   });
   return next();
 }
@@ -401,13 +407,13 @@ function requestGroups(req, _res, next) {
 /**
  * Validates root user authentication by comparing the bind DN with the configured admin DN.
  * @param {object} req - Request object
- * @param {object} res - Response object
+ * @param {object} _res - Response object
  * @param {function} next - Next handler function of filter chain
  */
 function authorize(req, _res, next) {
   if (!req.connection.ldap.bindDN.equals(req.site.adminDn)) {
     logWarn(req.site, "Rejected search without proper binding!");
-    return next(new ldap.InsufficientAccessRightsError());
+    return next(new Error("Insufficient access rights, must bind to LDAP admin user first!"));
   }
   return next();
 }
@@ -415,7 +421,7 @@ function authorize(req, _res, next) {
 /**
  * Performs debug logging if debug mode is enabled.
  * @param {object} req - Request object
- * @param {object} res - Response object
+ * @param {object} _res - Response object
  * @param {function} next - Next handler function of filter chain
  */
 function searchLogging(req, _res, next) {
@@ -431,16 +437,16 @@ function searchLogging(req, _res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function sendUsers(req, res, next) {
-  var strDn = req.dn.toString();
-  req.usersPromise.then(function (users) {
-    users.forEach(function (u) {
+  const strDn = req.dn.toString();
+  req.usersPromise.then((users) => {
+    users.forEach((u) => {
       if ((req.checkAll || parseDN(strDn).equals(parseDN(u.dn))) && (req.filter.matches(u.attributes))) {
         logDebug(req.site, "MatchUser: " + u.dn);
         res.send(u);
       }
     });
     return next();
-  }).catch(function (error) {
+  }, (error) => {
     logError(req.site, "Error while retrieving users: ", error);
     return next();
   });
@@ -453,16 +459,16 @@ function sendUsers(req, res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function sendGroups(req, res, next) {
-  var strDn = req.dn.toString();
-  req.groupsPromise.then(function (groups) {
-    groups.forEach(function (g) {
+  const strDn = req.dn.toString();
+  req.groupsPromise.then((groups) => {
+    groups.forEach((g) => {
       if ((req.checkAll || parseDN(strDn).equals(parseDN(g.dn))) && (req.filter.matches(g.attributes))) {
         logDebug(req.site, "MatchGroup: " + g.dn);
         res.send(g);
       }
     });
     return next();
-  }).catch(function (error) {
+  }, (error) => {
     logError(req.site, "Error while retrieving groups: ", error);
     return next();
   });
@@ -470,7 +476,7 @@ function sendGroups(req, res, next) {
 
 /**
  * Calls the res.end() function to finalize successful chain processing.
- * @param {object} req - Request object
+ * @param {object} _req - Request object
  * @param {object} res - Response object
  * @param {function} next - Next handler function of filter chain
  */
@@ -480,85 +486,90 @@ function endSuccess(_req, res, next) {
 }
 
 /**
- * Checks the given credentials against the credentials in the config file or against a ChurchTools server.
+ * Checks the given credentials against the credentials in the config file or against the ChurchTools API.
  * @param {object} req - Request object
- * @param {object} res - Response object
+ * @param {object} _res - Response object
  * @param {function} next - Next handler function of filter chain
  */
-function authenticate(req, _res, next) {
-  var site = req.site;
+async function authenticate(req, _res, next) {
+  const site = req.site;
   if (req.dn.equals(site.adminDn)) {
     logDebug(site, "Admin bind DN: " + req.dn.toString());
-    // If ldap_password is undefined, try a default ChurchTools authentication with this user
-    if (site.ldap_password !== undefined) {
-      site.checkPassword(req.credentials, function (result) {
-        if (result) {
-          logDebug(site, "Authentication success");
-          return next();
-        } else {
-          logWarn(site, "Invalid root password!");
-          return next(new ldap.InvalidCredentialsError());
-        }
-      });
-      return;
+    // If ldapPassword is undefined, try a default ChurchTools authentication with this user
+    if (site.ldapPassword !== undefined) {
+      try {
+        await site.authenticateAdmin(req.credentials);
+        logDebug(site, "Admin bind successful");
+        return next();
+      } catch (error) {
+        logError(site, `Invalid password for admin bind or auth error: ${error.message}`);
+        return next(error);
+      }
+    } else {
+      logDebug("ldapPassword is undefined, trying ChurchTools authentication...")
     }
   } else {
     logDebug(site, "Bind user DN: %s", req.dn);
   }
-  apiPost(site, "authenticate", {
-    "user": req.dn.rdns[0].attrs.cn.value,
-    "password": req.credentials
-  }).then(function () {
+  try {
+    await site.api.post('login', {
+      json: {
+        "username": req.dn.rdns[0].attrs.cn.value,
+        "password": req.credentials
+      }
+    });
     logDebug(site, "Authentication successful for " + req.dn.toString());
     return next();
-  }).catch(function (error) {
+  } catch (error) {
     logError(site, "Authentication error: ", error);
-    return next(new ldap.InvalidCredentialsError());
-  });
+    return next(new Error("Invalid LDAP password"));
+  }
 }
 
-Object.keys(config.sites).map(function (sitename) {
+Object.keys(sites).map((siteName) => {
   // Login bind for user
-  server.bind("ou=users,o=" + sitename, function (req, _res, next) {
-    req.site = config.sites[sitename];
+  server.bind("ou=users,o=" + siteName, (req, _res, next) => {
+    req.site = sites[siteName];
     next();
   }, authenticate, endSuccess);
 
   // Search implementation for user search
-  server.search("ou=users,o=" + sitename, function (req, _res, next) {
-    req.site = config.sites[sitename];
+  server.search("ou=users,o=" + siteName, (req, _res, next) => {
+    req.site = sites[siteName];
     next();
-  }, searchLogging, authorize, function (req, _res, next) {
-    logDebug({ sitename: sitename }, "Search for users");
+  }, searchLogging, authorize, (req, _res, next) => {
+    logDebug({ siteName: siteName }, "Search for users");
     req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
     return next();
   }, requestUsers, sendUsers, endSuccess);
 
   // Search implementation for group search
-  server.search("ou=groups,o=" + sitename, function (req, _res, next) {
-    req.site = config.sites[sitename];
+  server.search("ou=groups,o=" + siteName, (req, _res, next) => {
+    req.site = sites[siteName];
     next();
-  }, searchLogging, authorize, function (req, _res, next) {
-    logDebug({ sitename: sitename }, "Search for groups");
+  }, searchLogging, authorize, (req, _res, next) => {
+    logDebug({ siteName: siteName }, "Search for groups");
     req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
     return next();
   }, requestGroups, sendGroups, endSuccess);
 
   // Search implementation for user and group search
-  server.search("o=" + sitename, function (req, _res, next) {
-    req.site = config.sites[sitename];
+  server.search("o=" + siteName, (req, _res, next) => {
+    req.site = sites[siteName];
     next();
-  }, searchLogging, authorize, function (req, _res, next) {
-    logDebug({ sitename: sitename }, "Search for users and groups combined");
+  }, searchLogging, authorize, (req, _res, next) => {
+    logDebug({ siteName: siteName }, "Search for users and groups combined");
     req.checkAll = req.scope === "sub";
     return next();
   }, requestUsers, requestGroups, sendUsers, sendGroups, endSuccess);
 });
 
 // Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
-server.search('', function (req, res) {
-  logDebug({ sitename: req.dn.o }, "empty request, return directory information");
-  var obj = {
+server.search('', (req, res) => {
+  // noinspection JSUnresolvedVariable
+  logDebug({ siteName: req.dn.o }, "Empty request, return directory information");
+  // noinspection JSUnresolvedVariable
+  const obj = {
     "attributes": {
       "objectClass": ["top", "OpenLDAProotDSE"],
       "subschemaSubentry": ["cn=subschema"],
@@ -567,8 +578,9 @@ server.search('', function (req, res) {
     "dn": "",
   };
 
-  if (req.filter.matches(obj.attributes))
+  if (req.filter.matches(obj.attributes)) {
     res.send(obj);
+  }
 
   res.end();
 }, endSuccess);
@@ -576,30 +588,28 @@ server.search('', function (req, res) {
 
 function escapeRegExp(str) {
   /* JSSTYLED */
-  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
+  return str.replace(/[\-\[\]\/{}()*+?.\\^$|]/g, '\\$&');
 }
 
 /** 
- * Case insensitive search on substring filters
+ * Case-insensitive search on substring filters
  * Credits to @alansouzati, see https://github.com/ldapjs/node-ldapjs/issues/156
  */
-ldap.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
-  var tv = helpers.getAttrValue(target, this.attribute, strictAttrCase);
+ldap.filters.SubstringFilter.prototype.matches = (target, strictAttrCase) => {
+  const tv = helpers.getAttrValue(target, this.attribute, strictAttrCase);
   if (tv !== undefined && tv !== null) {
-    var re = '';
+    let re = '';
 
-    if (this.initial)
+    if (this.initial) {
       re += '^' + escapeRegExp(this.initial) + '.*';
-    this.any.forEach(function (s) {
-      re += escapeRegExp(s) + '.*';
-    });
-    if (this.final)
+    }
+    this.any.forEach((s) => re += escapeRegExp(s) + '.*');
+    if (this.final) {
       re += escapeRegExp(this.final) + '$';
+    }
 
-    var matcher = new RegExp(re, 'i');
-    return helpers.testValues(function (v) {
-      return matcher.test(v);
-    }, tv);
+    const matcher = new RegExp(re, 'i');
+    return helpers.testValues((v) => matcher.test(v), tv, false);
   }
 
   return false;
@@ -607,6 +617,6 @@ ldap.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
 
 
 // Start LDAP server
-server.listen(parseInt(config.ldap_port), config.ldap_ip, function () {
-  console.log('ChurchTools-LDAP-Wrapper listening @ %s', server.url);
+server.listen(parseInt(config.ldapPort), config.ldapIp, () => {
+  logDebug({ siteName: 'root logger' }, `ChurchTools-LDAP-Wrapper listening @ ${server.url}`);
 });
