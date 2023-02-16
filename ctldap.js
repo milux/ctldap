@@ -106,6 +106,11 @@ Object.keys(sites).map((siteName) => {
     site.uniqueEmails = identityFn;
   }
 
+  /**
+   * Tries to perform a local LDAP admin authentication, locking for one day after 5 failed login approaches.
+   * @param password Password to use for LDAP admin authentication.
+   * @returns {Promise<void>} Promise resolves upon successful authentication, rejects on error.
+   */
   site.authenticateAdmin = async (password) => {
     if (site.loginBlockedDate) {
       const now = new Date();
@@ -118,6 +123,7 @@ Object.keys(sites).map((siteName) => {
       }
     }
     try {
+      // Delegate password check to the associated algorithm based on type of password hashing, see below.
       await site.checkPassword(password);
     } catch (error) {
       site.loginErrorCount += 1;
@@ -204,11 +210,19 @@ function getCached(site, key, factory) {
   return promise;
 }
 
+/**
+ * Fetches all data from a paginated API endpoint.
+ * Automatically "heals" the wrong behavior of unpatched pagination when requesting with limit of -1
+ * by transparently fetching missing record(s) with another request.
+ * @param {object} site The site for which this information is requested.
+ * @param {string} apiPath The API endpoint to query for all paginated data.
+ * @param {object} [searchParams] Additional search params (query parameters)
+ */
 async function fetchAllPaginatedHack(site, apiPath, searchParams) {
   // Get all records except the last one
   const result = await site.api.get(apiPath, {
     searchParams: {
-      ...searchParams,
+      ...(searchParams || {}),
       limit: -1
     }
   });
@@ -219,7 +233,7 @@ async function fetchAllPaginatedHack(site, apiPath, searchParams) {
     const limit = total - data.length;
     const last = await site.api.get(apiPath, {
       searchParams: {
-        ...searchParams,
+        ...(searchParams || {}),
         limit,
         page: Math.ceil(total / limit)
       }
@@ -229,6 +243,10 @@ async function fetchAllPaginatedHack(site, apiPath, searchParams) {
   return data;
 }
 
+/**
+ * Fetches all mappings of persons and groups.
+ * @param {object} site The site for which this information is requested.
+ */
 async function fetchMemberships(site) {
   const result = await site.api.get('groups/members', {
     searchParams: {"with_deleted": false}
@@ -237,6 +255,11 @@ async function fetchMemberships(site) {
   return result['data'];
 }
 
+/**
+ * Fetches all persons and computes dn values.
+ * Persons are filtered by accepted invitations, because uninvited users cannot do logins anyway.
+ * @param {object} site The site for which this information is requested.
+ */
 async function fetchPersons(site) {
   const data = await fetchAllPaginatedHack(site, 'persons');
   logDebug(site, "fetchPersons done");
@@ -250,23 +273,32 @@ async function fetchPersons(site) {
   return personMap;
 }
 
+/**
+ * Fetches all groups and computes dn values and "special classes" for custom LDAP objectClass attributes.
+ * @param {object} site The site for which this information is requested.
+ */
 async function fetchGroups(site) {
   const data = await fetchAllPaginatedHack(site, 'groups');
   logDebug(site, "fetchGroups done");
   const groupMap = {};
   const sgmKeys = Object.keys(site.specialGroupMappings);
   data.forEach((g) => {
-    const info = g['information'];
-    g.specialClasses = sgmKeys.filter((k) => info[k])
     // Strip some irrelevant information
     delete g['settings'];
     delete g['roles'];
-    groupMap[g['id']] = g;
+    // Pre-compute the "distinguished name" of this group for LDAP
     g.dn = site.compatTransform(site.fnGroupDn({cn: g['name']}));
+    const info = g['information'];
+    g.specialClasses = sgmKeys.filter((k) => info[k])
+    groupMap[g['id']] = g;
   });
   return groupMap;
 }
 
+/**
+ * Fetches all group types from person master data.
+ * @param {object} site The site for which this information is requested.
+ */
 async function fetchGroupTypes(site) {
   const result = await site.api.get('person/masterdata');
   logDebug(site, "fetchGroupTypes done");
@@ -275,6 +307,10 @@ async function fetchGroupTypes(site) {
   return groupTypes;
 }
 
+/**
+ * Collects all required group and user information and computes group-to-users and user-to-groups mappings.
+ * @param {object} site The site for which this information is requested.
+ */
 async function fetchAll(site) {
   return await getCached(site, RAW_DATA_KEY, async () => {
     const [personMap, groupMap, memberships, groupTypes] = await Promise.all([
@@ -337,6 +373,7 @@ function requestUsers(req, _res, next) {
           objectclass: [
             'person',
             'CTPerson',
+            // Map special CT field names of associated groups to the LDAP objectClass names defined in configuration.
             ...(p2g[id] || [])
                 .flatMap((gid) => groupMap[gid].specialClasses)
                 .map((key) => site.specialGroupMappings[key]['personClass'])
@@ -384,6 +421,7 @@ function requestGroups(req, _res, next) {
       const info = g['information'];
       const groupType = groupTypes[info['groupTypeId']];
       const objectClasses = ["group", "CTGroup" + groupType.charAt(0).toUpperCase() + groupType.slice(1),
+        // Map observed special CT field names to the LDAP objectClass names defined in configuration.
         ...g.specialClasses.map((key) => site.specialGroupMappings[key]['groupClass'])];
       return {
         dn: g.dn,

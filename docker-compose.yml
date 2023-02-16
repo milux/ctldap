@@ -9,8 +9,6 @@ services:
       - "1389:1389"
     networks:
       - ldap
-    dns:
-      - 8.8.8.8
     env_file:
       - ./.env
 

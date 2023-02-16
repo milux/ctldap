@@ -1,5 +1,18 @@
 # Changelog
 
+### 3.0.0
+- Use new ChurchTools API (`/api`) and token-based authentication
+- Supports custom LDAP `objectClass` classes for users and groups based on CT group fields
+- Removed old installation instructions, now only targeting `Docker` on amd64 and arm64
+- Switched config format to YAML
+- Support for `argon2`-hashed LDAP admin passwords
+- Use node.js 18
+- Replaced deprecated `request`-related libraries with `got` library
+- Use `async`/`await` instead of explicit Promises in most places
+- Improved Logging
+- Switched to type "module" with modern import syntax
+- Cleanups
+
 ### 2.2.2
 - Fixed recursion bug (GitHub issue #3)
 - Logging Bugfix
