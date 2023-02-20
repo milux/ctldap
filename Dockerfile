@@ -9,7 +9,7 @@ COPY --chown=node:node package.json .
 COPY --chown=node:node yarn.lock .
 RUN yarn install
 
-COPY --chown=node:node ctldap.js .
+COPY --chown=node:node *.js .
 COPY --chown=node:node ctldap.yml .
 
 EXPOSE 1389

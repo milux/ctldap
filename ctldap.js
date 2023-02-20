@@ -1,23 +1,18 @@
-// ctldap - ChurchTools LDAP-Wrapper 3.0
-// This tool requires a node.js-Server and a recent version of ChurchTools 3
-// (c) 2017-2023 Michael Lux
-// (c) 2019-2020 Matthias Huber
-// (c) 2019 André Schild
-// License: GNU/GPL v3.0
-
-import got from 'got';
+/**
+ * ctldap - ChurchTools LDAP-Wrapper 3.0
+ * This tool requires a node.js-Server and a recent version of ChurchTools 3
+ * @copyright 2017-2023 Michael Lux
+ * @copyright 2019-2020 Matthias Huber
+ * @copyright André Schild
+ * @licence GNU/GPL v3.0
+ */
 import helpers from "ldap-filter";
-import bcrypt from "bcrypt";
-import argon2 from "argon2";
-import ldapEsc from "ldap-escape";
 import fs from "fs";
 import ldap from "ldapjs";
-import { readYamlEnvSync } from 'yaml-env-defaults';
+import { CtldapConfig } from "./ctldap-config.js";
 
 const parseDN = ldap.parseDN;
-const yaml = readYamlEnvSync('./ctldap.yml');
-const config = yaml.config;
-const sites = yaml.sites || {};
+const config = new CtldapConfig();
 
 function getIsoDate() {
   return new Date().toISOString();
@@ -25,142 +20,22 @@ function getIsoDate() {
 
 function logDebug(site, msg) {
   if (config.debug) {
-    console.log(`${getIsoDate()} [DEBUG] ${site.siteName} - ${msg}`);
+    console.log(`${getIsoDate()} [DEBUG] ${site.name} - ${msg}`);
   }
 }
 
 function logWarn(site, msg) {
-  console.warn(`${getIsoDate()} [WARN]  ${site.siteName} - ${msg}`);
+  console.warn(`${getIsoDate()} [WARN]  ${site.name} - ${msg}`);
 }
 
 function logError(site, msg, error) {
-  console.error(`${getIsoDate()} [ERROR] ${site.siteName} - ${msg}`);
+  console.error(`${getIsoDate()} [ERROR] ${site.name} - ${msg}`);
   if (error !== undefined) {
     console.error(error.stack);
   }
 }
 
-logDebug({ siteName: 'root logger' }, "Debug mode enabled, expect lots of output!");
-
-if (typeof config.cacheLifetime !== 'number' && isNaN(config.cacheLifetime)) {
-  config.cacheLifetime = 300000;  // 5 minutes
-}
-
-// If no sites are configured, create one from the global config properties
-if (config.ldapBaseDn) {
-  sites[config.ldapBaseDn] = {
-    siteName: config.ldapBaseDn,
-    ldapPassword: config.ldapPassword,
-    ctUri: config.ctUri,
-    apiToken: config.apiToken,
-    specialGroupMappings: config.specialGroupMappings
-  }
-}
-
-Object.keys(sites).map((siteName) => {
-  const site = sites[siteName];
-
-  site.siteName = siteName;
-  site.fnUserDn = ldapEsc.dn("cn=${cn},ou=users,o=" + siteName);
-  site.fnGroupDn = ldapEsc.dn("cn=${cn},ou=groups,o=" + siteName);
-  site.api = got.extend({
-    headers: { "Authorization": `Login ${site.apiToken}` },
-    prefixUrl: `${site.ctUri.replace(/\/$/g, '')}/api`,
-    responseType: 'json',
-    resolveBodyOnly: true,
-    http2: true
-  });
-  site.adminDn = site.fnUserDn({ cn: config.ldapUser });
-  site.CACHE = {};
-  site.loginErrorCount = 0;
-  site.loginBlockedDate = null;
-
-  const identityFn = (p) => p;
-  const stringLowerFn = (s) => typeof s === "string" ? s.toLowerCase() : s;
-
-  if (site.dnLowerCase || ((site.dnLowerCase === undefined) && config.dnLowerCase)) {
-    site.compatTransform = stringLowerFn;
-  } else {
-    site.compatTransform = identityFn;
-  }
-
-  if (site.emailLowerCase || ((site.emailLowerCase === undefined) && config.emailLowerCase)) {
-    site.compatTransformEmail = stringLowerFn;
-  } else {
-    site.compatTransformEmail = identityFn;
-  }
-
-  if (site.emailsUnique || ((site.emailsUnique === undefined) && config.emailsUnique)) {
-    site.uniqueEmails = (users) => {
-      const mails = {};
-      return users.filter((user) => {
-        if (!user.attributes.email) {
-          return false;
-        }
-        const result = !(user.attributes.email in mails);
-        mails[user.attributes.email] = true;
-        return result;
-      });
-    };
-  } else {
-    site.uniqueEmails = identityFn;
-  }
-
-  /**
-   * Tries to perform a local LDAP admin authentication, locking for one day after 5 failed login approaches.
-   * @param password Password to use for LDAP admin authentication.
-   * @returns {Promise<void>} Promise resolves upon successful authentication, rejects on error.
-   */
-  site.authenticateAdmin = async (password) => {
-    if (site.loginBlockedDate) {
-      const now = new Date();
-      const checkDate = new Date(site.loginBlockedDate.getTime() + 1000 * 3600 * 24); // one day
-      if (now < checkDate) {
-        throw Error("Login blocked!");
-      } else {
-        site.loginBlockedDate = null;
-        site.loginErrorCount = 0;
-      }
-    }
-    try {
-      // Delegate password check to the associated algorithm based on type of password hashing, see below.
-      await site.checkPassword(password);
-    } catch (error) {
-      site.loginErrorCount += 1;
-      if (site.loginErrorCount > 5) {
-        site.loginBlockedDate = new Date();
-      }
-      throw error;
-    }
-  };
-
-  // If LDAP admin password has been provided, set the right verification algorithm based on hash format.
-  if (site.ldapPassword) {
-    if (/^\$2[yab]\$/.test(site.ldapPassword)) {
-      // Assume bcrypt hash
-      site.checkPassword = async (password) => {
-        const hash = site.ldapPassword.replace(/^\$2y\$/, '$2a$');
-        if (!await bcrypt.compare(password, hash)) {
-          throw Error("Wrong password, bcrypt hash didn't match!");
-        }
-      };
-    } else if (/^\$argon2[id]{1,2}\$/.test(site.ldapPassword)) {
-      // Assume argon2 hash
-      site.checkPassword = async (password) => {
-        if (!await argon2.verify(site.ldapPassword, password)) {
-          throw Error("Wrong password, argon2 hash didn't match!");
-        }
-      }
-    } else {
-      // Assume plaintext password
-      site.checkPassword = async (password) => {
-        if (password !== site.ldapPassword) {
-          throw Error("Wrong password, plaintext didn't match!")
-        }
-      };
-    }
-  }
-});
+logDebug({ name: 'root logger' }, "Debug mode enabled, expect lots of output!");
 
 let options = {};
 if (config.ldapCertFilename && config.ldapKeyFilename) {
@@ -267,7 +142,7 @@ async function fetchPersons(site) {
   data.forEach((p) => {
     if (p['invitationStatus'] === "accepted") {
       personMap[p['id']] = p;
-      p.dn = site.compatTransform(site.fnUserDn({cn: p['cmsUserId']}));
+      p.dn = site.compatTransform(site.fnUserDn(p['cmsUserId']));
     }
   });
   return personMap;
@@ -287,7 +162,7 @@ async function fetchGroups(site) {
     delete g['settings'];
     delete g['roles'];
     // Pre-compute the "distinguished name" of this group for LDAP
-    g.dn = site.compatTransform(site.fnGroupDn({cn: g['name']}));
+    g.dn = site.compatTransform(site.fnGroupDn(g['name']));
     const info = g['information'];
     g.specialClasses = sgmKeys.filter((k) => info[k])
     groupMap[g['id']] = g;
@@ -303,6 +178,7 @@ async function fetchGroupTypes(site) {
   const result = await site.api.get('person/masterdata');
   logDebug(site, "fetchGroupTypes done");
   const groupTypes = {};
+  // noinspection JSUnresolvedFunction
   result['data']['groupTypes'].forEach((gt) => groupTypes[gt['id']] = gt['name']);
   return groupTypes;
 }
@@ -385,9 +261,9 @@ function requestUsers(req, _res, next) {
     newCache = site.uniqueEmails(newCache);
     // Virtual admin user
     if (site.ldapPassword !== undefined) {
-      const cn = config.ldapUser;
+      const cn = site.ldapUser;
       newCache.push({
-        dn: site.compatTransform(site.fnUserDn({ cn: cn })),
+        dn: site.compatTransform(site.fnUserDn(cn)),
         attributes: {
           cn,
           displayname: "LDAP Administrator",
@@ -564,39 +440,39 @@ async function authenticate(req, _res, next) {
   }
 }
 
-Object.keys(sites).map((siteName) => {
+config.sites.forEach((site) => {
   // Login bind for user
-  server.bind("ou=users,o=" + siteName, (req, _res, next) => {
-    req.site = sites[siteName];
+  server.bind(`ou=users,o=${site.name}`, (req, _res, next) => {
+    req.site = site;
     next();
   }, authenticate, endSuccess);
 
   // Search implementation for user search
-  server.search("ou=users,o=" + siteName, (req, _res, next) => {
-    req.site = sites[siteName];
+  server.search(`ou=users,o=${site.name}`, (req, _res, next) => {
+    req.site = site;
     next();
   }, searchLogging, authorize, (req, _res, next) => {
-    logDebug({ siteName: siteName }, "Search for users");
+    logDebug(site, "Search for users");
     req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
     return next();
   }, requestUsers, sendUsers, endSuccess);
 
   // Search implementation for group search
-  server.search("ou=groups,o=" + siteName, (req, _res, next) => {
-    req.site = sites[siteName];
+  server.search(`ou=groups,o=${site.name}`, (req, _res, next) => {
+    req.site = site;
     next();
   }, searchLogging, authorize, (req, _res, next) => {
-    logDebug({ siteName: siteName }, "Search for groups");
+    logDebug(site, "Search for groups");
     req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
     return next();
   }, requestGroups, sendGroups, endSuccess);
 
   // Search implementation for user and group search
-  server.search("o=" + siteName, (req, _res, next) => {
-    req.site = sites[siteName];
+  server.search(`o=${site.name}`, (req, _res, next) => {
+    req.site = site;
     next();
   }, searchLogging, authorize, (req, _res, next) => {
-    logDebug({ siteName: siteName }, "Search for users and groups combined");
+    logDebug(site, "Search for users and groups combined");
     req.checkAll = req.scope === "sub";
     return next();
   }, requestUsers, requestGroups, sendUsers, sendGroups, endSuccess);
@@ -605,7 +481,7 @@ Object.keys(sites).map((siteName) => {
 // Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
 server.search('', (req, res) => {
   // noinspection JSUnresolvedVariable
-  logDebug({ siteName: req.dn.o }, "Empty request, return directory information");
+  logDebug({ name: req.dn.o }, "Empty request, return directory information");
   // noinspection JSUnresolvedVariable
   const obj = {
     "attributes": {
@@ -633,7 +509,7 @@ function escapeRegExp(str) {
  * Case-insensitive search on substring filters
  * Credits to @alansouzati, see https://github.com/ldapjs/node-ldapjs/issues/156
  */
-ldap.filters.SubstringFilter.prototype.matches = (target, strictAttrCase) => {
+ldap.filters.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
   const tv = helpers.getAttrValue(target, this.attribute, strictAttrCase);
   if (tv !== undefined && tv !== null) {
     let re = '';
@@ -656,5 +532,5 @@ ldap.filters.SubstringFilter.prototype.matches = (target, strictAttrCase) => {
 
 // Start LDAP server
 server.listen(parseInt(config.ldapPort), config.ldapIp, () => {
-  logDebug({ siteName: 'root logger' }, `ChurchTools-LDAP-Wrapper listening @ ${server.url}`);
+  logDebug({ name: 'root logger' }, `ChurchTools-LDAP-Wrapper listening @ ${server.url}`);
 });

@@ -1,5 +1,5 @@
 *
-!ctldap.js
+!*.js
 !ctldap.yml
 !package.json
 !yarn.lock

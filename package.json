@@ -9,9 +9,9 @@
     "argon2": "^0.30.3",
     "bcrypt": "^5.0.0",
     "got": "^12.5.3",
-    "ldap-escape": "^1.1.5",
+    "ldap-escape": "^2.0.6",
     "ldap-filter": "^0.3.3",
-    "ldapjs": "^1.0.2",
+    "ldapjs": "^2.3.3",
     "yaml-env-defaults": "^2.0.2"
   },
   "scripts": {

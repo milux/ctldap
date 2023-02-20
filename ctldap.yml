@@ -1,6 +1,12 @@
 config:
   # Add debug infos to log, non-empty string means "true"!
   debug: ${DEBUG:#}
+  # LDAP server ip to listen on, change it to 0.0.0.0 when external access required
+  ldapIp: ${LDAP_IP:0.0.0.0}
+  # LDAP server port, you may change this to the privileged default port 389.
+  ldapPort: ${LDAP_PORT:1389}
+  # This controls (in milliseconds) how old the user/group data can be until it is fetched from ChurchTools again
+  cacheLifetime: ${CACHE_LIFETIME_MS:300000}
 
   # This is required for clients using lowercase DNs, e.g. ownCloud/nextCloud
   dnLowerCase: ${IS_DN_LOWER_CASE:true}
@@ -15,11 +21,6 @@ config:
   # LDAP base DN, "o=<xxx>", e.g. "o=churchtools"
   ldapBaseDn: ${LDAP_BASE_DN:churchtools}
 
-  # LDAP server ip to listen on, change it to 0.0.0.0 when external access required
-  ldapIp: ${LDAP_IP:0.0.0.0}
-  # LDAP server port, you may change this to the privileged default port 389.
-  ldapPort: ${LDAP_PORT:1389}
-
   # The URI pointing to the root of your ChurchTools installation
   ctUri: ${CT_URI:#https://mysite.church.tools}
   # This access token is used to authenticate against ChurchTools for API access.
@@ -31,9 +32,6 @@ config:
   # - Login via https://your.ct.domain/api > "General" > "login" (copy your "personId" from the shown output!)
   # - Get your token via "Person" > "/persons/{personId}/logintoken"
   apiToken: ${API_TOKEN}
-
-  # This controls (in milliseconds) how old the user/group data can be until it is fetched from ChurchTools again
-  cacheLifetime: ${CACHE_LIFETIME_MS:300000}
 
   # This map specifies special group properties, typically yes/no-columns, that, when found in the group information,
   # are translated to additional LDAP object classes that will be attached to the group and user objects.
@@ -48,23 +46,25 @@ config:
   # openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365
   # Use this command to remove the encryption password:
   # openssl rsa -in key.pem -out newkey.pem && mv newkey.pem key.pem
-#  ldap_cert_filename: cert.pem
-#  ldap_key_filename: key.pem
+#  ldapCertFilename: cert.pem
+#  ldapKeyFilename: key.pem
 
 
 # Define the sites here. For each site please enter one section.
-# The section title has to be in the format sites.<ldap_base_dn>, e.g. "sites.foobar",
-# where foobar is the organisation, as in the instance foobar.church.tools.
-# ldap_password_bcrypt is optional, if not specified, the default value will be taken from the config above
-# dn_lower_case is optional, if not specified, the default value will be taken from the config above
-# email_lower_case is optional, if not specified, the default value will be taken from the config above
-# If ldap_base_dn is set above, the setting above are treated as an additional site.
+# If ldapBaseDn is set above, the global settings above are treated as an additional site.
+# The sites have to be named like their desired LDAP BASE DN organization, i.e. "foobar" for foobar.church.tools.
+# dnLowerCase is optional, if not specified, the default value will be taken from the config above.
+# emailLowerCase is optional, if not specified, the default value will be taken from the config above.
 
 sites:
 #  xxxxxxxxxx:
-#    ldap_password: XXXXXXXXXXXXXXXXXXXX
-#    ldap_password_bcrypt: true
-#    ct_uri: https://XXXXXXXXXXXXXXXXXXXX.church.tools/
-#    api_token: XXXXXXXXXXXXXXXXXXXX
-#    dn_lower_case: true
-#    email_lower_case: true
+#    dnLowerCase: true
+#    emailLowerCase: true
+#    ldapUser: root
+#    ldapPassword: $argon2id$XXXXXXXXXXXXXXXXXXXX
+#    ctUri: https://XXXXXXXXXXXXXXXXXXXX.church.tools/
+#    apiToken: XXXXXXXXXXXXXXXXXXXX
+#    specialGroupMappings:
+#      nextcloud:
+#        groupClass: NextCloudGroup
+#        personClass: NextCloudUser
