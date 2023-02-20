@@ -1,4 +1,4 @@
-# ctldap 3.0.0 - LDAP Wrapper for ChurchTools
+# ctldap 3.0.1 - LDAP Wrapper for ChurchTools
 
 This software acts as an LDAP server for ChurchTools 3
 

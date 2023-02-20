@@ -1,5 +1,10 @@
 # Changelog
 
+### 3.0.1
+- Fixed scope of `ldap.filters.SubstringFilter.prototype.matches` (no arrow function...)
+- Updated `ldapjs` and `ldap-escape`
+- Modularized project a bit
+
 ### 3.0.0
 - Use new ChurchTools API (`/api`) and token-based authentication
 - Supports custom LDAP `objectClass` classes for users and groups based on CT group fields
