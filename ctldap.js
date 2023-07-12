@@ -86,34 +86,32 @@ function getCached(site, key, factory) {
 }
 
 /**
- * Fetches all data from a paginated API endpoint.
- * Automatically "heals" the wrong behavior of unpatched pagination when requesting with limit of -1
- * by transparently fetching missing record(s) with another request.
+ * Fetches all data from a paginated API endpoint with a limit of 100 records per request.
  * @param {object} site The site for which this information is requested.
  * @param {string} apiPath The API endpoint to query for all paginated data.
  * @param {object} [searchParams] Additional search params (query parameters)
  */
 async function fetchAllPaginatedHack(site, apiPath, searchParams) {
   // Get all records except the last one
+  const lim = 100;
   const result = await site.api.get(apiPath, {
     searchParams: {
       ...(searchParams || {}),
-      limit: -1
+      limit: lim
     }
   });
-  const data = result['data'];
+  let data = result['data'];
   const total = result['meta']['pagination']['total'];
-  if (data.length < total) {
-    // Fetch last record and append it to the result
-    const limit = total - data.length;
-    const last = await site.api.get(apiPath, {
+
+  for(let i=lim; i<= total; i+=lim) {
+    const batch = await site.api.get(apiPath, {
       searchParams: {
         ...(searchParams || {}),
-        limit,
-        page: Math.ceil(total / limit)
+        limit: lim,
+        page: Math.ceil((i / lim) + 1)
       }
     });
-    data.push(last['data'][0]);
+    data = data.concat(batch['data']);
   }
   return data;
 }
