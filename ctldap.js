@@ -527,6 +527,9 @@ ldap.filters.SubstringFilter.prototype.matches = function (target, strictAttrCas
   return false;
 };
 
+ldap.ExtensibleFilter.super_.prototype.matches = function() {
+}
+
 
 // Start LDAP server
 server.listen(parseInt(config.ldapPort), config.ldapIp, () => {
