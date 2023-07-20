@@ -8,6 +8,7 @@ import got from "got";
 import bcrypt from "bcrypt";
 import argon2 from "argon2";
 import { CtldapConfig } from "./ctldap-config.js"
+import { CookieJar } from "tough-cookie";
 
 export class CtldapSite {
 
@@ -31,12 +32,17 @@ export class CtldapSite {
         this.api = got.extend({
             headers: { "Authorization": `Login ${site.apiToken}` },
             prefixUrl: `${site.ctUri.replace(/\/$/g, '')}/api`,
+            // Let us keep cookies, which may improve CT API performance.
+            // "undefined" is fine as "store" parameter here, it results in memory storage.
+            cookieJar: new CookieJar(undefined),
             responseType: 'json',
             resolveBodyOnly: true,
             http2: true
         });
         this.adminDn = this.fnUserDn(site.ldapUser);
-        this.CACHE = {};
+        this.CACHE = {
+            pagination: {}
+        };
         this.loginErrorCount = 0;
         this.loginBlockedDate = null;
 

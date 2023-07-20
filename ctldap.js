@@ -11,6 +11,14 @@ import fs from "fs";
 import ldap from "ldapjs";
 import { CtldapConfig } from "./ctldap-config.js";
 
+/**
+ * Simple integer range as array, inspired by https://developer.mozilla.org
+ * @param start Start integer, inclusive
+ * @param end Stop integer, exclusive
+ * @return {number[]} Array with number sequence
+ */
+const range = (start, end) => Array.from({ length: end - start }, (_, i) => start + i);
+
 const parseDN = ldap.parseDN;
 const config = new CtldapConfig();
 
@@ -93,29 +101,41 @@ function getCached(site, key, factory) {
  * @param {string} apiPath The API endpoint to query for all paginated data.
  * @param {object} [searchParams] Additional search params (query parameters)
  */
-async function fetchAllPaginatedHack(site, apiPath, searchParams) {
-  // Get all records except the last one
-  const result = await site.api.get(apiPath, {
-    searchParams: {
-      ...(searchParams || {}),
-      limit: -1
-    }
-  });
-  const data = result['data'];
-  const total = result['meta']['pagination']['total'];
-  if (data.length < total) {
-    // Fetch last record and append it to the result
-    const limit = total - data.length;
-    const last = await site.api.get(apiPath, {
+async function fetchAllPaginated(site, apiPath, searchParams= {}) {
+  // Closure for fetching a single page
+  const fetchPage = (page) => {
+    return site.api.get(apiPath, {
       searchParams: {
-        ...(searchParams || {}),
-        limit,
-        page: Math.ceil(total / limit)
+        ...searchParams,
+        page
       }
     });
-    data.push(last['data'][0]);
+  };
+  // Get pagination meta cache
+  const pCache = site.CACHE.pagination;
+  // Assume the same number of pages as last time, default to 1
+  const assumedPages = pCache[site] || 1;
+  // Fetch assumed number of pages
+  const promises = range(1, assumedPages + 1).map(fetchPage);
+  // Await first result
+  const firstResult = await Promise.any(promises);
+  // Check first result for completeness, and fix up results and pagination cache if necessary
+  const nPages = firstResult['meta']['pagination']['lastPage'];
+  if (nPages !== assumedPages) {
+    logDebug(site, `Assumed ${assumedPages} page(s) of data for /api/${apiPath}, but had to load ${nPages}.`);
+    // Update meta cache
+    pCache[site] = nPages;
+    // Fetch remaining pages, if any
+    if (nPages > assumedPages) {
+      promises.push(...range(assumedPages + 1, nPages + 1).map(fetchPage));
+    }
+  } else {
+    logDebug(site, `Assumed ${assumedPages} page(s) of data for /api/${apiPath}, which was correct.`);
   }
-  return data;
+  // Await all results
+  const results = await Promise.all(promises);
+  // Collect all data via flatMap() and return it
+  return results.flatMap(r => r['data']);
 }
 
 /**
@@ -136,7 +156,7 @@ async function fetchMemberships(site) {
  * @param {object} site The site for which this information is requested.
  */
 async function fetchPersons(site) {
-  const data = await fetchAllPaginatedHack(site, 'persons');
+  const data = await fetchAllPaginated(site, 'persons', { limit: 500 });
   logDebug(site, "fetchPersons done");
   const personMap = {};
   data.forEach((p) => {
@@ -153,7 +173,7 @@ async function fetchPersons(site) {
  * @param {object} site The site for which this information is requested.
  */
 async function fetchGroups(site) {
-  const data = await fetchAllPaginatedHack(site, 'groups');
+  const data = await fetchAllPaginated(site, 'groups', { limit: 100 });
   logDebug(site, "fetchGroups done");
   const groupMap = {};
   const sgmKeys = Object.keys(site.specialGroupMappings);

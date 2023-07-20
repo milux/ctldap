@@ -7,6 +7,8 @@ USER node
 
 COPY --chown=node:node package.json .
 COPY --chown=node:node yarn.lock .
+COPY --chown=node:node .yarnrc.yml .
+COPY --chown=node:node .yarn ./.yarn
 RUN yarn install
 
 COPY --chown=node:node *.js .

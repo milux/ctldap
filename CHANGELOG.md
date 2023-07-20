@@ -1,5 +1,10 @@
 # Changelog
 
+### 3.0.2
+- Fixed error due to changed ChurchTools API pagination behavior
+- Keep session cookies, which gains about 100 ms speedup
+- Updated `yarn`, `bcrypt` and `got`
+
 ### 3.0.1
 - Fixed scope of `ldap.filters.SubstringFilter.prototype.matches` (no arrow function...)
 - Updated `ldapjs` and `ldap-escape`
