@@ -14,7 +14,8 @@ export class CtldapConfig {
     constructor() {
         const yaml = readYamlEnvSync('./ctldap.yml');
         const config = yaml.config;
-        this.debug = CtldapConfig.asOptionalBool(config.debug);
+        this.trace = CtldapConfig.asOptionalBool(config.trace);
+        this.debug = this.trace || CtldapConfig.asOptionalBool(config.debug);
         this.ldapIp = config.ldapIp;
         this.ldapPort = config.ldapPort;
 

@@ -1,4 +1,4 @@
-# ctldap 3.0.2 - LDAP Wrapper for ChurchTools
+# ctldap 3.1.0 - LDAP Wrapper for ChurchTools
 
 This software acts as an LDAP server for ChurchTools 3
 
@@ -9,7 +9,7 @@ This software acts as an LDAP server for ChurchTools 3
 
 The old installation methods are discouraged and won't be supported any further.
 
-## Migration from version 2.2.2
+## Migration from version 2.x to 3.x
 Version 3.0.0 includes some breaking changes in the configuration format and some parameters.
 Assuming Docker setup, the necessary adaptations are not that difficult, though.
 

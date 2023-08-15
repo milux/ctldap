@@ -9,6 +9,7 @@ import bcrypt from "bcrypt";
 import argon2 from "argon2";
 import { CtldapConfig } from "./ctldap-config.js"
 import { CookieJar } from "tough-cookie";
+import { logWarn } from "./ctldap.js"
 
 export class CtldapSite {
 
@@ -30,11 +31,24 @@ export class CtldapSite {
         this.fnUserDn = (cn) => ldapEscape.dn`cn=${cn},ou=users,o=${name}`;
         this.fnGroupDn = (cn) => ldapEscape.dn`cn=${cn},ou=groups,o=${name}`;
         this.api = got.extend({
-            headers: { "Authorization": `Login ${site.apiToken}` },
+            headers: {"Authorization": `Login ${site.apiToken}`},
             prefixUrl: `${site.ctUri.replace(/\/$/g, '')}/api`,
             // Let us keep cookies, which may improve CT API performance.
             // "undefined" is fine as "store" parameter here, it results in memory storage.
             cookieJar: new CookieJar(undefined),
+            retry: {
+                statusCodes: [403, 408, 413, 429, 500, 502, 503, 504, 521, 522, 524]
+            },
+            hooks: {
+                beforeRetry: [
+                    (error, _retryCount) => {
+                        if (error.response.statusCode === 403) {
+                            logWarn(this, "CT API responded with HTTP 403, clearing cookies before retry...");
+                            error.options.cookieJar.removeAllCookiesSync();
+                        }
+                    }
+                ]
+            },
             responseType: 'json',
             resolveBodyOnly: true,
             http2: true

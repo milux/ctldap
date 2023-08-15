@@ -1,6 +1,8 @@
 config:
   # Add debug infos to log, non-empty string means "true"!
-  debug: ${DEBUG:#}
+  debug: ${DEBUG:false}
+  # Add verbose debug infos to log, non-empty string means "true"!
+  trace: ${TRACE:false}
   # LDAP server ip to listen on, change it to 0.0.0.0 when external access required
   ldapIp: ${LDAP_IP:0.0.0.0}
   # LDAP server port, you may change this to the privileged default port 389.

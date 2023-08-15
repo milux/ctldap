@@ -6,10 +6,14 @@
  * @copyright André Schild
  * @licence GNU/GPL v3.0
  */
-import helpers from "ldap-filter";
 import fs from "fs";
-import ldap from "ldapjs";
+import ldapjs from "ldapjs";
+const { InsufficientAccessRightsError, InvalidCredentialsError, OtherError, parseDN } = ldapjs;
 import { CtldapConfig } from "./ctldap-config.js";
+import { patchLdapjsFilters } from "./ldapjs-filter-overrides.js";
+
+// Make some ldapjs filters case-insensitive
+patchLdapjsFilters();
 
 /**
  * Simple integer range as array, inspired by https://developer.mozilla.org
@@ -19,24 +23,29 @@ import { CtldapConfig } from "./ctldap-config.js";
  */
 const range = (start, end) => Array.from({ length: end - start }, (_, i) => start + i);
 
-const parseDN = ldap.parseDN;
 const config = new CtldapConfig();
 
 function getIsoDate() {
   return new Date().toISOString();
 }
 
-function logDebug(site, msg) {
+export const logTrace = (site, msg)  => {
+  if (config.trace) {
+    console.log(`${getIsoDate()} [TRACE] ${site.name} - ${msg}`);
+  }
+}
+
+export const logDebug = (site, msg) => {
   if (config.debug) {
     console.log(`${getIsoDate()} [DEBUG] ${site.name} - ${msg}`);
   }
 }
 
-function logWarn(site, msg) {
+export const logWarn = (site, msg) => {
   console.warn(`${getIsoDate()} [WARN]  ${site.name} - ${msg}`);
 }
 
-function logError(site, msg, error) {
+export const logError = (site, msg, error) => {
   console.error(`${getIsoDate()} [ERROR] ${site.name} - ${msg}`);
   if (error !== undefined) {
     console.error(error.stack);
@@ -51,7 +60,7 @@ if (config.ldapCertFilename && config.ldapKeyFilename) {
       ldapKey = fs.readFileSync(new URL(`./${config.ldapKeyFilename}`, import.meta.url), { encoding: "utf8" });
   options = { certificate: ldapCert, key: ldapKey };
 }
-const server = ldap.createServer();
+const server = ldapjs.createServer(options);
 
 const USERS_KEY = 'users', GROUPS_KEY = 'groups', RAW_DATA_KEY = 'rawData';
 
@@ -253,11 +262,11 @@ function requestUsers(req, _res, next) {
         dn: p.dn,
         attributes: {
           cn,
-          displayname: `${p['firstName']} ${p['lastName']}`,
+          displayName: `${p['firstName']} ${p['lastName']}`,
           id,
           uid: cn,
-          nsuniqueid: `u${id}`,
-          givenname: p['firstName'],
+          nsUniqueId: `u${id}`,
+          givenName: p['firstName'],
           street: p['street'],
           telephoneMobile: p['mobile'],
           telephoneHome: p['phonePrivate'],
@@ -266,7 +275,7 @@ function requestUsers(req, _res, next) {
           sn: p['lastName'],
           email,
           mail: email,
-          objectclass: [
+          objectClass: [
             'person',
             'CTPerson',
             // Map special CT field names of associated groups to the LDAP objectClass names defined in configuration.
@@ -274,7 +283,7 @@ function requestUsers(req, _res, next) {
                 .flatMap((gid) => groupMap[gid].specialClasses)
                 .map((key) => site.specialGroupMappings[key]['personClass'])
           ],
-          memberof: (p2g[id] || []).map((gid) => groupMap[gid].dn)
+          memberOf: (p2g[id] || []).map((gid) => groupMap[gid].dn)
         }
       };
     });
@@ -289,9 +298,9 @@ function requestUsers(req, _res, next) {
           displayname: "LDAP Administrator",
           id: 0,
           uid: cn,
-          nsuniqueid: "u0",
-          givenname: "LDAP Administrator",
-          objectclass: ['person'],
+          nsUniqueId: "u0",
+          givenName: "LDAP Administrator",
+          objectClass: ['person'],
         }
       });
     }
@@ -325,9 +334,9 @@ function requestGroups(req, _res, next) {
           cn,
           displayname: g['name'],
           id,
-          nsuniqueid: `g${id}`,
-          objectclass: objectClasses,
-          uniquemember: (g2p[id] || []).map((pid) => personMap[pid].dn)
+          nsUniqueId: `g${id}`,
+          objectClass: objectClasses,
+          uniqueMember: (g2p[id] || []).map((pid) => personMap[pid].dn)
         }
       };
     });
@@ -347,7 +356,7 @@ function requestGroups(req, _res, next) {
 function authorize(req, _res, next) {
   if (!req.connection.ldap.bindDN.equals(req.site.adminDn)) {
     logWarn(req.site, "Rejected search without proper binding!");
-    return next(new Error("Insufficient access rights, must bind to LDAP admin user first!"));
+    return next(new InsufficientAccessRightsError());
   }
   return next();
 }
@@ -359,7 +368,7 @@ function authorize(req, _res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function searchLogging(req, _res, next) {
-  logDebug(req.site, "SEARCH base object: " + req.dn.toString() + " scope: " + req.scope);
+  logDebug(req.site, "SEARCH base object: " + req.dn.toString() + " scope: " + req.scopeName);
   logDebug(req.site, "Filter: " + req.filter.toString());
   return next();
 }
@@ -371,17 +380,16 @@ function searchLogging(req, _res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function sendUsers(req, res, next) {
-  const strDn = req.dn.toString();
   req.usersPromise.then((users) => {
     users.forEach((u) => {
-      if ((req.checkAll || parseDN(strDn).equals(parseDN(u.dn))) && (req.filter.matches(u.attributes))) {
-        logDebug(req.site, "MatchUser: " + u.dn);
+      if ((req.checkAll || req.dn.equals(u.dn)) && req.filter.matches(u.attributes, false)) {
+        logTrace(req.site, "MatchUser: " + u.dn.toString());
         res.send(u);
       }
     });
     return next();
   }, (error) => {
-    logError(req.site, "Error while retrieving users: ", error);
+    logError(req.site, "Error whilst retrieving users: ", error);
     return next();
   });
 }
@@ -393,17 +401,16 @@ function sendUsers(req, res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function sendGroups(req, res, next) {
-  const strDn = req.dn.toString();
   req.groupsPromise.then((groups) => {
     groups.forEach((g) => {
-      if ((req.checkAll || parseDN(strDn).equals(parseDN(g.dn))) && (req.filter.matches(g.attributes))) {
-        logDebug(req.site, "MatchGroup: " + g.dn);
+      if ((req.checkAll || req.dn.equals(g.dn)) && req.filter.matches(g.attributes, false)) {
+        logTrace(req.site, "MatchGroup: " + g.dn);
         res.send(g);
       }
     });
     return next();
   }, (error) => {
-    logError(req.site, "Error while retrieving groups: ", error);
+    logError(req.site, "Error whilst retrieving groups: ", error);
     return next();
   });
 }
@@ -427,8 +434,8 @@ function endSuccess(_req, res, next) {
  */
 async function authenticate(req, _res, next) {
   const site = req.site;
-  if (req.dn.equals(site.adminDn)) {
-    logDebug(site, "Admin bind DN: " + req.dn.toString());
+  if (req.dn === site.adminDn) {
+    logDebug(site, "Admin bind DN: " + req.dn);
     // If ldapPassword is undefined, try a default ChurchTools authentication with this user
     if (site.ldapPassword !== undefined) {
       try {
@@ -436,8 +443,8 @@ async function authenticate(req, _res, next) {
         logDebug(site, "Admin bind successful");
         return next();
       } catch (error) {
-        logError(site, `Invalid password for admin bind or auth error: ${error.message}`);
-        return next(error);
+        logError(site, `Invalid password for admin bind or auth error: `, error);
+        return next(new InvalidCredentialsError());
       }
     } else {
       logDebug("ldapPassword is undefined, trying ChurchTools authentication...")
@@ -445,18 +452,24 @@ async function authenticate(req, _res, next) {
   } else {
     logDebug(site, "Bind user DN: %s", req.dn);
   }
+  const username = parseDN(req.dn).rdnAt(0).getValue("cn");
   try {
     await site.api.post('login', {
       json: {
-        "username": req.dn.rdns[0].attrs.cn.value,
+        "username": username,
         "password": req.credentials
       }
     });
-    logDebug(site, "Authentication successful for " + req.dn.toString());
+    logDebug(site, "Authentication successful for " + req.dn);
     return next();
   } catch (error) {
-    logError(site, "Authentication error: ", error);
-    return next(new Error("Invalid LDAP password"));
+    if (error.response?.statusCode === 400) {
+      logWarn(site, `Authentication error (CT API HTTP 400) occurred for ${username} (probably wrong password): ${error}`);
+      return next(new InvalidCredentialsError());
+    } else {
+      logError(site, `Authentication error for ${username}: ${error}`);
+      return next(new OtherError());
+    }
   }
 }
 
@@ -473,7 +486,7 @@ config.sites.forEach((site) => {
     next();
   }, searchLogging, authorize, (req, _res, next) => {
     logDebug(site, "Search for users");
-    req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
+    req.checkAll = req.scopeName !== "base" && req.dn.length === 2;
     return next();
   }, requestUsers, sendUsers, endSuccess);
 
@@ -483,7 +496,7 @@ config.sites.forEach((site) => {
     next();
   }, searchLogging, authorize, (req, _res, next) => {
     logDebug(site, "Search for groups");
-    req.checkAll = req.scope !== "base" && req.dn.rdns.length === 2;
+    req.checkAll = req.scopeName !== "base" && req.dn.length === 2;
     return next();
   }, requestGroups, sendGroups, endSuccess);
 
@@ -493,7 +506,7 @@ config.sites.forEach((site) => {
     next();
   }, searchLogging, authorize, (req, _res, next) => {
     logDebug(site, "Search for users and groups combined");
-    req.checkAll = req.scope === "sub";
+    req.checkAll = req.scopeName === "subtree";
     return next();
   }, requestUsers, requestGroups, sendUsers, sendGroups, endSuccess);
 });
@@ -512,43 +525,12 @@ server.search('', (req, res) => {
     "dn": "",
   };
 
-  if (req.filter.matches(obj.attributes)) {
+  if (req.filter.matches(obj.attributes, false)) {
     res.send(obj);
   }
 
   res.end();
 }, endSuccess);
-
-
-function escapeRegExp(str) {
-  /* JSSTYLED */
-  return str.replace(/[\-\[\]\/{}()*+?.\\^$|]/g, '\\$&');
-}
-
-/** 
- * Case-insensitive search on substring filters
- * Credits to @alansouzati, see https://github.com/ldapjs/node-ldapjs/issues/156
- */
-ldap.filters.SubstringFilter.prototype.matches = function (target, strictAttrCase) {
-  const tv = helpers.getAttrValue(target, this.attribute, strictAttrCase);
-  if (tv !== undefined && tv !== null) {
-    let re = '';
-
-    if (this.initial) {
-      re += '^' + escapeRegExp(this.initial) + '.*';
-    }
-    this.any.forEach((s) => re += escapeRegExp(s) + '.*');
-    if (this.final) {
-      re += escapeRegExp(this.final) + '$';
-    }
-
-    const matcher = new RegExp(re, 'i');
-    return helpers.testValues((v) => matcher.test(v), tv, false);
-  }
-
-  return false;
-};
-
 
 // Start LDAP server
 server.listen(parseInt(config.ldapPort), config.ldapIp, () => {

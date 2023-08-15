@@ -1,5 +1,15 @@
 # Changelog
 
+### 3.1.0
+- Migrated to `ldapjs` 3.0.4
+- Added case-insensitive EqualityFilter.matches() implementation
+(i.e. now supports **case-insensitive user & email matching,** yay!)
+- Aligned case-insensitive SubstringFilter.matches() implementation with `ldapjs` 3.x
+- Fixed LDAP errors when logging in with wrong credentials
+- Added workaround for ChurchTools API HTTP status 403 on session expiry
+- Added back options object (for TLS encryption) in `ldapjs.createServer()`
+- Introduced new logging level `TRACE` for very verbose log outputs
+
 ### 3.0.2
 - Fixed error due to changed ChurchTools API pagination behavior
 - Keep session cookies, which gains about 100 ms speedup

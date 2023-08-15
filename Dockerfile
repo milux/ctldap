@@ -11,8 +11,8 @@ COPY --chown=node:node .yarnrc.yml .
 COPY --chown=node:node .yarn ./.yarn
 RUN yarn install
 
-COPY --chown=node:node *.js .
 COPY --chown=node:node ctldap.yml .
+COPY --chown=node:node *.js .
 
 EXPOSE 1389
 
