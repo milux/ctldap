@@ -9,7 +9,7 @@ import bcrypt from "bcrypt";
 import argon2 from "argon2";
 import { CtldapConfig } from "./ctldap-config.js"
 import { CookieJar } from "tough-cookie";
-import { logWarn } from "./ctldap.js"
+import { logTrace, logWarn } from "./ctldap.js"
 
 export class CtldapSite {
 
@@ -30,24 +30,51 @@ export class CtldapSite {
         this.name = name;
         this.fnUserDn = (cn) => ldapEscape.dn`cn=${cn},ou=users,o=${name}`;
         this.fnGroupDn = (cn) => ldapEscape.dn`cn=${cn},ou=groups,o=${name}`;
+        // Let us keep cookies, which may improve CT API performance.
+        // We have to use a pool of CookieJars in order to avoid ChurchTools HTTP 403 bugs.
+        const cookieJars = []
         this.api = got.extend({
             headers: {"Authorization": `Login ${site.apiToken}`},
             prefixUrl: `${site.ctUri.replace(/\/$/g, '')}/api`,
-            // Let us keep cookies, which may improve CT API performance.
-            // "undefined" is fine as "store" parameter here, it results in memory storage.
-            cookieJar: new CookieJar(undefined),
             retry: {
                 statusCodes: [403, 408, 413, 429, 500, 502, 503, 504, 521, 522, 524]
             },
             hooks: {
+                beforeRequest: [
+                    options => {
+                        let cookieJar = cookieJars.pop()
+                        if (!cookieJar) {
+                            // "undefined" is fine as "store" parameter here, it results in memory storage.
+                            cookieJar = new CookieJar(undefined);
+                            logTrace(site, "Assign new CookieJar.")
+                        } else {
+                            logTrace(site, () => `Reusing CookieJar: ${JSON.stringify(cookieJar)}`)
+                        }
+                        options.cookieJar = cookieJar
+                    }
+                ],
                 beforeRetry: [
-                    (error, _retryCount) => {
+                    (error, retryCount) => {
                         if (error.response.statusCode === 403) {
-                            logWarn(this, "CT API responded with HTTP 403, clearing cookies before retry...");
+                            logWarn(
+                                this,
+                                `CT API responded with HTTP 403, clearing cookies before retry ${retryCount}...`
+                            );
                             error.options.cookieJar.removeAllCookiesSync();
                         }
                     }
-                ]
+                ],
+                afterResponse: [
+                    (response, _retryWithMergedOptions) => {
+                        // Return CookieJar to pool
+                        if (response.statusCode === 200) {
+                            const cookieJar = response.request.options.cookieJar
+                            logTrace(site, () => `Return CookieJar: ${JSON.stringify(cookieJar)}`)
+                            cookieJars.push(cookieJar)
+                        }
+                        return response;
+                    }
+                ],
             },
             responseType: 'json',
             resolveBodyOnly: true,

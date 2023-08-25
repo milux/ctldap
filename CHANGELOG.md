@@ -1,5 +1,10 @@
 # Changelog
 
+### 3.1.1
+- Introduced CookieJar pools as workaround for ChurchTools HTTP 403 bugs
+- Fixed default cache lifetime in `Dockerfile`
+- Fixed some debug output
+
 ### 3.1.0
 - Migrated to `ldapjs` 3.0.4
 - Added case-insensitive EqualityFilter.matches() implementation

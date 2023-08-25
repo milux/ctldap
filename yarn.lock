@@ -281,7 +281,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"argon2@npm:0.30.3":
+"argon2@npm:^0.30.3":
   version: 0.30.3
   resolution: "argon2@npm:0.30.3"
   dependencies:
@@ -473,7 +473,7 @@ __metadata:
     "@ldapjs/filter": ^2.1.0
     "@ldapjs/messages": ^1.2.0
     "@ldapjs/protocol": ^1.2.1
-    argon2: 0.30.3
+    argon2: ^0.30.3
     bcrypt: ^5.1.0
     got: ^13.0.0
     ldap-escape: ^2.0.6

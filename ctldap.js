@@ -8,9 +8,9 @@
  */
 import fs from "fs";
 import ldapjs from "ldapjs";
-const { InsufficientAccessRightsError, InvalidCredentialsError, OtherError, parseDN } = ldapjs;
 import { CtldapConfig } from "./ctldap-config.js";
 import { patchLdapjsFilters } from "./ldapjs-filter-overrides.js";
+const { InsufficientAccessRightsError, InvalidCredentialsError, OtherError, parseDN } = ldapjs;
 
 // Make some ldapjs filters case-insensitive
 patchLdapjsFilters();
@@ -31,12 +31,20 @@ function getIsoDate() {
 
 export const logTrace = (site, msg)  => {
   if (config.trace) {
+    // For lazy evaluation
+    if (typeof msg === "function") {
+      msg = msg()
+    }
     console.log(`${getIsoDate()} [TRACE] ${site.name} - ${msg}`);
   }
 }
 
 export const logDebug = (site, msg) => {
   if (config.debug) {
+    // For lazy evaluation
+    if (typeof msg === "function") {
+      msg = msg()
+    }
     console.log(`${getIsoDate()} [DEBUG] ${site.name} - ${msg}`);
   }
 }
@@ -131,7 +139,7 @@ async function fetchAllPaginated(site, apiPath, searchParams= {}) {
   // Check first result for completeness, and fix up results and pagination cache if necessary
   const nPages = firstResult['meta']['pagination']['lastPage'];
   if (nPages !== assumedPages) {
-    logDebug(site, `Assumed ${assumedPages} page(s) of data for /api/${apiPath}, but had to load ${nPages}.`);
+    logDebug(site, () => `Assumed ${assumedPages} page(s) of data for /api/${apiPath}, but had to load ${nPages}.`);
     // Update meta cache
     pCache[site] = nPages;
     // Fetch remaining pages, if any
@@ -139,7 +147,7 @@ async function fetchAllPaginated(site, apiPath, searchParams= {}) {
       promises.push(...range(assumedPages + 1, nPages + 1).map(fetchPage));
     }
   } else {
-    logDebug(site, `Assumed ${assumedPages} page(s) of data for /api/${apiPath}, which was correct.`);
+    logDebug(site, () => `Assumed ${assumedPages} page(s) of data for /api/${apiPath}, which was correct.`);
   }
   // Await all results
   const results = await Promise.all(promises);
@@ -304,8 +312,7 @@ function requestUsers(req, _res, next) {
         }
       });
     }
-    const size = newCache.length;
-    logDebug(site, "Updated users: " + size);
+    logDebug(site, () => `Updated users: ${newCache.length}`);
     return newCache;
   });
   return next();
@@ -340,8 +347,7 @@ function requestGroups(req, _res, next) {
         }
       };
     });
-    const size = newCache.length;
-    logDebug(site, "Updated groups: " + size);
+    logDebug(site, () => `Updated groups: ${newCache.length}`);
     return newCache;
   });
   return next();
@@ -368,8 +374,8 @@ function authorize(req, _res, next) {
  * @param {function} next - Next handler function of filter chain
  */
 function searchLogging(req, _res, next) {
-  logDebug(req.site, "SEARCH base object: " + req.dn.toString() + " scope: " + req.scopeName);
-  logDebug(req.site, "Filter: " + req.filter.toString());
+  logDebug(req.site, () => `SEARCH base object: ${req.dn.toString()} scope: ${req.scopeName}`);
+  logDebug(req.site, () => `Filter: ${req.filter.toString()}`);
   return next();
 }
 
@@ -383,7 +389,7 @@ function sendUsers(req, res, next) {
   req.usersPromise.then((users) => {
     users.forEach((u) => {
       if ((req.checkAll || req.dn.equals(u.dn)) && req.filter.matches(u.attributes, false)) {
-        logTrace(req.site, "MatchUser: " + u.dn.toString());
+        logTrace(req.site, () => `MatchUser: ${u.dn.toString()}`);
         res.send(u);
       }
     });
@@ -404,7 +410,7 @@ function sendGroups(req, res, next) {
   req.groupsPromise.then((groups) => {
     groups.forEach((g) => {
       if ((req.checkAll || req.dn.equals(g.dn)) && req.filter.matches(g.attributes, false)) {
-        logTrace(req.site, "MatchGroup: " + g.dn);
+        logTrace(req.site, () => `MatchGroup: ${g.dn}`);
         res.send(g);
       }
     });
@@ -435,22 +441,22 @@ function endSuccess(_req, res, next) {
 async function authenticate(req, _res, next) {
   const site = req.site;
   if (req.dn === site.adminDn) {
-    logDebug(site, "Admin bind DN: " + req.dn);
+    logDebug(site, () => `Admin bind with DN "${req.dn}"`);
     // If ldapPassword is undefined, try a default ChurchTools authentication with this user
-    if (site.ldapPassword !== undefined) {
+    if (site.ldapPassword) {
       try {
         await site.authenticateAdmin(req.credentials);
         logDebug(site, "Admin bind successful");
         return next();
       } catch (error) {
-        logError(site, `Invalid password for admin bind or auth error: `, error);
+        logError(site, "Invalid password for admin bind or auth error: ", error);
         return next(new InvalidCredentialsError());
       }
     } else {
       logDebug("ldapPassword is undefined, trying ChurchTools authentication...")
     }
   } else {
-    logDebug(site, "Bind user DN: %s", req.dn);
+    logDebug(site, () => `Bind user with DN "${req.dn}"`);
   }
   const username = parseDN(req.dn).rdnAt(0).getValue("cn");
   try {
@@ -460,14 +466,14 @@ async function authenticate(req, _res, next) {
         "password": req.credentials
       }
     });
-    logDebug(site, "Authentication successful for " + req.dn);
+    logDebug(site, `Authentication successful for "${username}"`);
     return next();
   } catch (error) {
     if (error.response?.statusCode === 400) {
-      logWarn(site, `Authentication error (CT API HTTP 400) occurred for ${username} (probably wrong password): ${error}`);
+      logWarn(site, `Authentication error (CT API HTTP 400) occurred for "${username}" (probably wrong password): ${error}`);
       return next(new InvalidCredentialsError());
     } else {
-      logError(site, `Authentication error for ${username}: ${error}`);
+      logError(site, `Authentication error for "${username}": ${error}`);
       return next(new OtherError());
     }
   }
@@ -520,7 +526,7 @@ server.search('', (req, res) => {
     "attributes": {
       "objectClass": ["top", "OpenLDAProotDSE"],
       "subschemaSubentry": ["cn=subschema"],
-      "namingContexts": "o=" + req.dn.o,
+      "namingContexts": `o=${req.dn.o}`,
     },
     "dn": "",
   };
