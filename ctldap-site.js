@@ -5,8 +5,8 @@
  */
 import ldapEscape from "ldap-escape";
 import got from "got";
-import bcrypt from "bcrypt";
-import argon2 from "argon2";
+import bcrypt from "@node-rs/bcrypt";
+import argon2 from "@node-rs/argon2";
 import { CtldapConfig } from "./ctldap-config.js"
 import { CookieJar } from "tough-cookie";
 import { logTrace, logWarn } from "./ctldap.js"

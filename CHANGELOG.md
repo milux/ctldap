@@ -1,5 +1,9 @@
 # Changelog
 
+### 3.1.2
+- Changed crypto algorithms to `@node-rs/{argon2,bcrypt}`
+- Minor version updates
+
 ### 3.1.1
 - Introduced CookieJar pools as workaround for ChurchTools HTTP 403 bugs
 - Fixed default cache lifetime in `Dockerfile`

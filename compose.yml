@@ -1,6 +1,6 @@
 services:
 
-  ldap:
+  ctldap:
     build: .
     image: milux/ctldap:latest
     restart: unless-stopped
