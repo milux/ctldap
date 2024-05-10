@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 LABEL maintainer="Michael Lux <michi.lux@gmail.com>"
 
 WORKDIR /app
