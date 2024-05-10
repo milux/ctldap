@@ -8,6 +8,7 @@
  */
 import fs from "fs";
 import ldapjs from "ldapjs";
+import pino from "pino";
 import { CtldapConfig } from "./ctldap-config.js";
 import { patchLdapjsFilters } from "./ldapjs-filter-overrides.js";
 const { InsufficientAccessRightsError, InvalidCredentialsError, OtherError, parseDN } = ldapjs;
@@ -62,11 +63,21 @@ export const logError = (site, msg, error) => {
 
 logDebug({ name: 'root logger' }, "Debug mode enabled, expect lots of output!");
 
-let options = {};
+let options = {
+  log: pino({
+    level: config.trace ? "trace" : (config.debug ? "debug" : "info"),
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true
+      }
+    }
+  })
+};
 if (config.ldapCertFilename && config.ldapKeyFilename) {
   const ldapCert = fs.readFileSync(new URL(`./${config.ldapCertFilename}`, import.meta.url), { encoding: "utf8" }),
       ldapKey = fs.readFileSync(new URL(`./${config.ldapKeyFilename}`, import.meta.url), { encoding: "utf8" });
-  options = { certificate: ldapCert, key: ldapKey };
+  options = { ...options, certificate: ldapCert, key: ldapKey };
 }
 const server = ldapjs.createServer(options);
 
