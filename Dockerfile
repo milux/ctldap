@@ -16,6 +16,10 @@ COPY --chown=node:node *.js .
 
 EXPOSE 1389
 
+# process-warnings warning suppression
+ENV NODE_NO_WARNINGS 1
+
+ENV TRACE ""
 ENV DEBUG ""
 ENV IS_DN_LOWER_CASE true
 ENV IS_EMAIL_LOWER_CASE true

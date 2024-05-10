@@ -4,6 +4,7 @@
 - Updated to Node.js 20 (latest LTS)
 - Updated all dependencies to latest versions
 - Added logger for better `ldapjs` debugging
+- Suppress warnings caused by empty attributes from e.g. NextCloud
 
 ### 3.1.2
 - Changed crypto algorithms to `@node-rs/{argon2,bcrypt}`
