@@ -14,7 +14,7 @@ config:
   dnLowerCase: ${IS_DN_LOWER_CASE:true}
   # This is required for clients that need lowercase email addresses, e.g. Seafile
   emailLowerCase: ${IS_EMAIL_LOWER_CASE:true}
-  # Create aditional virtual groups for every role in group, e.g. for group "event a" with the roles "head" and "participant" the additional group "event a head" and "event a participant"
+  # Create additional virtual groups for each role within a group. For example, for the group 'Event A' with the roles 'Head' and 'Participant', create the additional groups 'Event A Head' and 'Event A Participant'.
   virtualRoleGroups: ${IS_VIRTUAL_ROLE_GROUPS:false}
 
   # LDAP admin user, can be a "virtual" root user or a ChurchTools username (virtual root is recommended!)
