@@ -200,17 +200,20 @@ async function fetchGroups(site) {
   const groupMap = {};
   const sgmKeys = Object.keys(site.specialGroupMappings);
   data.forEach((g) => {
-    g['roles'].forEach((r) => {
-      // Create new Group for each role
-      const s = {};
-      s.dn = site.compatTransform(site.fnGroupDn(g['name'] + ' ' + r['name']));
-      s.id = 'r' + r.id;
-      s.name = g['name'] + ' ' + r['name'];
-      s.information = g.information;
-      const info = s['information'];
-      s.specialClasses = sgmKeys.filter((k) => info[k])
-      groupMap[s['id']] = s;
-    });
+    
+    if (site.virtualRoleGroups || ((site.virtualRoleGroups === undefined) && config.virtualRoleGroups)) {
+      g['roles'].forEach((r) => {
+        // Create new Group for each role
+        const s = {};
+        s.dn = site.compatTransform(site.fnGroupDn(g['name'] + ' ' + r['name']));
+        s.id = 'r' + r.id;
+        s.name = g['name'] + ' ' + r['name'];
+        s.information = g.information;
+        const info = s['information'];
+        s.specialClasses = sgmKeys.filter((k) => info[k])
+        groupMap[s['id']] = s;
+      });
+    }
 
     // Strip some irrelevant information
     delete g['settings'];
@@ -248,20 +251,22 @@ async function fetchAll(site) {
       fetchPersons(site), fetchGroups(site), fetchMemberships(site), fetchGroupTypes(site)
     ]);
 
-    memberships.forEach((m) => {
-      const n = structuredClone(m);
+    if (site.virtualRoleGroups || ((site.virtualRoleGroups === undefined) && config.virtualRoleGroups)) {
+      memberships.forEach((m) => {
+        const n = structuredClone(m);
 
-      Object.entries(groupMap).forEach(([key, g]) => {
-        if (m.groupId == g.id) {
-          g.roles.forEach((r) => {
-            if (m.groupTypeRoleId == r.groupTypeRoleId) {
-              n.groupId = 'r' + r.id
-              memberships.push(n)
-            }
-          });
-        }
-      })
-    });
+        Object.entries(groupMap).forEach(([key, g]) => {
+          if (m.groupId == g.id) {
+            g.roles.forEach((r) => {
+              if (m.groupTypeRoleId == r.groupTypeRoleId) {
+                n.groupId = 'r' + r.id
+                memberships.push(n)
+              }
+            });
+          }
+        })
+      });
+    }
 
     logTrace(site, () => `Return Membership: ${JSON.stringify(memberships)}`)
 
@@ -376,8 +381,8 @@ function requestGroups(req, _res, next) {
         attributes: {
           cn,
           displayname: g['name'],
-          id,
-          nsUniqueId: `${id}`,
+          id: id.replace(/^g/g, ''),
+          nsUniqueId: id,
           objectClass: objectClasses,
           uniqueMember: (g2p[id] || []).map((pid) => personMap[pid].dn)
         }
