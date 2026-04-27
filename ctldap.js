@@ -164,7 +164,12 @@ async function fetchMemberships(site) {
     searchParams: {"with_deleted": false}
   });
   logDebug(site, "fetchMemberships done");
-  return result['data'];
+  const memberships = [];
+  result['data'].forEach((m) => {
+    m.groupId = 'g' + m.groupId
+    memberships.push(m);
+  });
+  return memberships;
 }
 
 /**
@@ -195,15 +200,28 @@ async function fetchGroups(site) {
   const groupMap = {};
   const sgmKeys = Object.keys(site.specialGroupMappings);
   data.forEach((g) => {
+    g['roles'].forEach((r) => {
+      // Create new Group for each role
+      const s = {};
+      s.dn = site.compatTransform(site.fnGroupDn(g['name'] + ' ' + r['name']));
+      s.id = 'r' + r.id;
+      s.name = g['name'] + ' ' + r['name'];
+      s.information = g.information;
+      const info = s['information'];
+      s.specialClasses = sgmKeys.filter((k) => info[k])
+      groupMap[s['id']] = s;
+    });
+
     // Strip some irrelevant information
     delete g['settings'];
-    delete g['roles'];
     // Pre-compute the "distinguished name" of this group for LDAP
     g.dn = site.compatTransform(site.fnGroupDn(g['name']));
+    g.id = 'g' + g.id;
     const info = g['information'];
     g.specialClasses = sgmKeys.filter((k) => info[k])
     groupMap[g['id']] = g;
   });
+  logTrace(site, () => `Return Group: ${JSON.stringify(groupMap)}`)
   return groupMap;
 }
 
@@ -229,6 +247,24 @@ async function fetchAll(site) {
     const [personMap, groupMap, memberships, groupTypes] = await Promise.all([
       fetchPersons(site), fetchGroups(site), fetchMemberships(site), fetchGroupTypes(site)
     ]);
+
+    memberships.forEach((m) => {
+      const n = structuredClone(m);
+
+      Object.entries(groupMap).forEach(([key, g]) => {
+        if (m.groupId == g.id) {
+          g.roles.forEach((r) => {
+            if (m.groupTypeRoleId == r.groupTypeRoleId) {
+              n.groupId = 'r' + r.id
+              memberships.push(n)
+            }
+          });
+        }
+      })
+    });
+
+    logTrace(site, () => `Return Membership: ${JSON.stringify(memberships)}`)
+
     // Create membership mappings
     const g2p = {}, p2g = {};
     memberships.forEach((m) => {
@@ -341,7 +377,7 @@ function requestGroups(req, _res, next) {
           cn,
           displayname: g['name'],
           id,
-          nsUniqueId: `g${id}`,
+          nsUniqueId: `${id}`,
           objectClass: objectClasses,
           uniqueMember: (g2p[id] || []).map((pid) => personMap[pid].dn)
         }
