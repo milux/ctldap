@@ -183,8 +183,15 @@ async function fetchPersons(site) {
   const personMap = {};
   data.forEach((p) => {
     if (p['invitationStatus'] === "accepted") {
-      personMap[p['id']] = p;
+      if (p['cmsUserId'] === ''){
+        p.cmsUserId = (p['firstName'] + '.' + p['lastName']).toLowerCase()
+          .replace('ö', 'oe')
+          .replace('ä', 'ae')
+          .replace('ü', 'ue')
+          .replace('ß', 'ss');
+      }
       p.dn = site.compatTransform(site.fnUserDn(p['cmsUserId']));
+      personMap[p['id']] = p;
     }
   });
   return personMap;
