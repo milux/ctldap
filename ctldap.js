@@ -7,6 +7,7 @@
  * @licence GNU/GPL v3.0
  */
 import fs from "fs";
+import jp from "jsonpath";
 import ldapjs from "ldapjs";
 import { CtldapConfig } from "./ctldap-config.js";
 import { patchLdapjsFilters } from "./ldapjs-filter-overrides.js";
@@ -311,6 +312,10 @@ function requestUsers(req, _res, next) {
     let newCache = Object.entries(personMap).map(([id, p]) => {
       const cn = p['cmsUserId'];
       const email = site.compatTransformEmail(p['email']);
+      const extraattributes ={};
+      for (const [key, value] of Object.entries(site.specialUserAttributes)) {
+        extraattributes[key] = jp.query(p, value);
+      }
       return {
         dn: p.dn,
         attributes: {
@@ -336,7 +341,8 @@ function requestUsers(req, _res, next) {
                 .flatMap((gid) => groupMap[gid].specialClasses)
                 .map((key) => site.specialGroupMappings[key]['personClass'])
           ],
-          memberOf: (p2g[id] || []).map((gid) => groupMap[gid].dn)
+          memberOf: (p2g[id] || []).map((gid) => groupMap[gid].dn),
+          ...extraattributes
         }
       };
     });

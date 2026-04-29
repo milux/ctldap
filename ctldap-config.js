@@ -29,6 +29,7 @@ export class CtldapConfig {
         this.ctUri = config.ctUri;
         this.apiToken = config.apiToken;
         this.specialGroupMappings = config.specialGroupMappings || {};
+        this.specialUserAttributes = config.specialUserAttributes || {};
         this.dnLowerCase = CtldapConfig.asOptionalBool(config.dnLowerCase);
         this.emailLowerCase = CtldapConfig.asOptionalBool(config.emailLowerCase);
         this.emailsUnique = CtldapConfig.asOptionalBool(config.emailsUnique);
@@ -45,7 +46,8 @@ export class CtldapConfig {
                 ldapPassword: config.ldapPassword,
                 ctUri: config.ctUri,
                 apiToken: config.apiToken,
-                specialGroupMappings: config.specialGroupMappings
+                specialGroupMappings: config.specialGroupMappings,
+                specialUserAttributes: config.specialUserAttributes
             }
         }
         this.sites = Object.keys(sites).map((siteName) => new CtldapSite(this, siteName, sites[siteName]));

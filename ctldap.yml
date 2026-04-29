@@ -45,6 +45,12 @@ config:
       groupClass: NextCloudGroup
       personClass: NextCloudUser
 
+  # This map can be used to add special attributes to the user. They can also get dynamicly from the user
+  # by jsonpath (https://github.com/dchester/jsonpath#jsonpath-syntax) to the array returned by the API.
+  # To get an example you can access https://mysite.church.tools/api/persons?limit=5
+  #specialUserAttributes:
+  #  age: '$.age'
+
   # To use SSL/TLS, provide file names for x509 certificate and key here
   # Use this command to create a private key and a certificate:
   # openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365
