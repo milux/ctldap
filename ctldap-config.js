@@ -40,14 +40,14 @@ export class CtldapConfig {
         // Configure sites
         const sites = yaml.sites || {};
         // If ldapBaseDn is set, create a site from the global config properties.
-        if (config.ldapBaseDn) {
-            sites[config.ldapBaseDn] = {
-                ldapUser: config.ldapUser,
-                ldapPassword: config.ldapPassword,
-                ctUri: config.ctUri,
-                apiToken: config.apiToken,
-                specialGroupMappings: config.specialGroupMappings,
-                specialUserAttributes: config.specialUserAttributes
+        if (this.ldapBaseDn) {
+            sites[this.ldapBaseDn] = {
+                ldapUser: this.ldapUser,
+                ldapPassword: this.ldapPassword,
+                ctUri: this.ctUri,
+                apiToken: this.apiToken,
+                specialGroupMappings: this.specialGroupMappings,
+                specialUserAttributes: this.specialUserAttributes
             }
         }
         this.sites = Object.keys(sites).map((siteName) => new CtldapSite(this, siteName, sites[siteName]));

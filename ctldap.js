@@ -312,10 +312,13 @@ function requestUsers(req, _res, next) {
     let newCache = Object.entries(personMap).map(([id, p]) => {
       const cn = p['cmsUserId'];
       const email = site.compatTransformEmail(p['email']);
-      const extraattributes ={};
-      for (const [key, value] of Object.entries(site.specialUserAttributes)) {
-        extraattributes[key] = jp.query(p, value);
-      }
+      const extraattributes = {};
+      Object.entries(site.specialUserAttributes).forEach(([key, value]) => {
+        const uvalue = jp.query(p, value);
+        if (uvalue.length !== 0 && uvalue[0] !== null) {
+          extraattributes[key] = uvalue;
+        }
+      });
       return {
         dn: p.dn,
         attributes: {

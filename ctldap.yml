@@ -78,3 +78,5 @@ sites:
 #      nextcloud:
 #        groupClass: NextCloudGroup
 #        personClass: NextCloudUser
+#    specialUserAttributes:
+#      age: '$.age'
