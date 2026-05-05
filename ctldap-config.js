@@ -34,6 +34,7 @@ export class CtldapConfig {
         this.emailLowerCase = CtldapConfig.asOptionalBool(config.emailLowerCase);
         this.emailsUnique = CtldapConfig.asOptionalBool(config.emailsUnique);
         this.virtualRoleGroups = CtldapConfig.asOptionalBool(config.virtualRoleGroups);
+        this.skipEmptyGroups = CtldapConfig.asOptionalBool(config.skipEmptyGroups);
         this.ldapCertFilename = config.ldapCertFilename;
         this.ldapKeyFilename = config.ldapKeyFilename;
         this.ldapBaseDn = config.ldapBaseDn;

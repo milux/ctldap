@@ -295,6 +295,14 @@ async function fetchAll(site) {
         }
       }
     });
+    if (site.skipEmptyGroups || ((site.skipEmptyGroups === undefined) && config.skipEmptyGroups)) {
+      Object.entries(groupMap).forEach(([key, g]) => {
+        if (!(key in g2p)) {
+          logDebug(site, "Removed empty group: " + g.dn);
+          delete groupMap[key]
+        }
+      });
+    }
     return { groupTypes, g2p, p2g, personMap, groupMap };
   });
 }

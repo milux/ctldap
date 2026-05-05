@@ -16,6 +16,8 @@ config:
   emailLowerCase: ${IS_EMAIL_LOWER_CASE:true}
   # Create additional virtual groups for each role within a group. For example, for the group 'Event A' with the roles 'Head' and 'Participant', create the additional groups 'Event A Head' and 'Event A Participant'.
   virtualRoleGroups: ${IS_VIRTUAL_ROLE_GROUPS:false}
+  # Hide groups without any member.
+  skipEmptyGroups: ${IS_SKIP_EMPTY_GROUPS:false}
 
   # LDAP admin user, can be a "virtual" root user or a ChurchTools username (virtual root is recommended!)
   ldapUser: ${LDAP_USER:root}
