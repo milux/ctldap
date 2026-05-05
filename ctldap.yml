@@ -14,6 +14,8 @@ config:
   dnLowerCase: ${IS_DN_LOWER_CASE:true}
   # This is required for clients that need lowercase email addresses, e.g. Seafile
   emailLowerCase: ${IS_EMAIL_LOWER_CASE:true}
+  # Hide persons with an invitation status not accepted
+  filterInvitedPersons: ${IS_FILTER_INVATED_PERSONS:true}
   # Create additional virtual groups for each role within a group. For example, for the group 'Event A' with the roles 'Head' and 'Participant', create the additional groups 'Event A Head' and 'Event A Participant'.
   virtualRoleGroups: ${IS_VIRTUAL_ROLE_GROUPS:false}
   # Hide groups without any member.

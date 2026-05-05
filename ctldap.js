@@ -183,7 +183,8 @@ async function fetchPersons(site) {
   logDebug(site, "fetchPersons done, found " + data.length + " persons");
   const personMap = {};
   data.forEach((p) => {
-    if (p['invitationStatus'] === "accepted") {
+    const filterInvitedPersons = (site.filterInvitedPersons || ((site.filterInvitedPersons === undefined) && config.filterInvitedPersons));
+    if ((!filterInvitedPersons) || (filterInvitedPersons && p['invitationStatus'] === "accepted")) {
       if (p['cmsUserId'] === ''){
         p.cmsUserId = (p['firstName'] + '.' + p['lastName']).toLowerCase()
           .replace('ö', 'oe')

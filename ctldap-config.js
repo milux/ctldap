@@ -33,6 +33,7 @@ export class CtldapConfig {
         this.dnLowerCase = CtldapConfig.asOptionalBool(config.dnLowerCase);
         this.emailLowerCase = CtldapConfig.asOptionalBool(config.emailLowerCase);
         this.emailsUnique = CtldapConfig.asOptionalBool(config.emailsUnique);
+        this.filterInvitedPersons = CtldapConfig.asOptionalBool(config.filterInvitedPersons);
         this.virtualRoleGroups = CtldapConfig.asOptionalBool(config.virtualRoleGroups);
         this.skipEmptyGroups = CtldapConfig.asOptionalBool(config.skipEmptyGroups);
         this.ldapCertFilename = config.ldapCertFilename;
