@@ -163,7 +163,7 @@ async function fetchMemberships(site) {
   const result = await site.api.get('groups/members', {
     searchParams: {"with_deleted": false}
   });
-  logDebug(site, "fetchMemberships done");
+  logDebug(site, "fetchMemberships done, found " + result['data'].length + " memberships");
   const memberships = [];
   result['data'].forEach((m) => {
     m.groupId = 'g' + m.groupId
@@ -179,7 +179,7 @@ async function fetchMemberships(site) {
  */
 async function fetchPersons(site) {
   const data = await fetchAllPaginated(site, 'persons', { limit: 500 });
-  logDebug(site, "fetchPersons done");
+  logDebug(site, "fetchPersons done, found " + data.length + " persons");
   const personMap = {};
   data.forEach((p) => {
     if (p['invitationStatus'] === "accepted") {
@@ -196,7 +196,7 @@ async function fetchPersons(site) {
  */
 async function fetchGroups(site) {
   const data = await fetchAllPaginated(site, 'groups', { limit: 100 });
-  logDebug(site, "fetchGroups done");
+  logDebug(site, "fetchGroups done, found " + data.length + " groups");
   const groupMap = {};
   const sgmKeys = Object.keys(site.specialGroupMappings);
   data.forEach((g) => {
@@ -224,7 +224,6 @@ async function fetchGroups(site) {
     g.specialClasses = sgmKeys.filter((k) => info[k])
     groupMap[g['id']] = g;
   });
-  logTrace(site, () => `Return Group: ${JSON.stringify(groupMap)}`)
   return groupMap;
 }
 
@@ -267,8 +266,6 @@ async function fetchAll(site) {
         })
       });
     }
-
-    logTrace(site, () => `Return Membership: ${JSON.stringify(memberships)}`)
 
     // Create membership mappings
     const g2p = {}, p2g = {};
