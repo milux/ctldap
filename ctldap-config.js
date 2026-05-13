@@ -28,8 +28,8 @@ export class CtldapConfig {
         this.ldapPassword = config.ldapPassword;
         this.ctUri = config.ctUri;
         this.apiToken = config.apiToken;
-        this.specialGroupMappings = config.specialGroupMappings || {};
-        this.specialUserAttributes = config.specialUserAttributes || {};
+        this.specialGroupMappings = config.specialGroupMappings;
+        this.specialUserAttributes = config.specialUserAttributes;
         this.dnLowerCase = CtldapConfig.asOptionalBool(config.dnLowerCase);
         this.emailLowerCase = CtldapConfig.asOptionalBool(config.emailLowerCase);
         this.emailsUnique = CtldapConfig.asOptionalBool(config.emailsUnique);
