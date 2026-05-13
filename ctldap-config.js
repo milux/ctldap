@@ -28,23 +28,28 @@ export class CtldapConfig {
         this.ldapPassword = config.ldapPassword;
         this.ctUri = config.ctUri;
         this.apiToken = config.apiToken;
-        this.specialGroupMappings = config.specialGroupMappings || {};
+        this.specialGroupMappings = config.specialGroupMappings;
+        this.specialUserAttributes = config.specialUserAttributes;
         this.dnLowerCase = CtldapConfig.asOptionalBool(config.dnLowerCase);
         this.emailLowerCase = CtldapConfig.asOptionalBool(config.emailLowerCase);
         this.emailsUnique = CtldapConfig.asOptionalBool(config.emailsUnique);
+        this.filterInvitedPersons = CtldapConfig.asOptionalBool(config.filterInvitedPersons);
+        this.virtualRoleGroups = CtldapConfig.asOptionalBool(config.virtualRoleGroups);
+        this.skipEmptyGroups = CtldapConfig.asOptionalBool(config.skipEmptyGroups);
         this.ldapCertFilename = config.ldapCertFilename;
         this.ldapKeyFilename = config.ldapKeyFilename;
         this.ldapBaseDn = config.ldapBaseDn;
         // Configure sites
         const sites = yaml.sites || {};
         // If ldapBaseDn is set, create a site from the global config properties.
-        if (config.ldapBaseDn) {
-            sites[config.ldapBaseDn] = {
-                ldapUser: config.ldapUser,
-                ldapPassword: config.ldapPassword,
-                ctUri: config.ctUri,
-                apiToken: config.apiToken,
-                specialGroupMappings: config.specialGroupMappings
+        if (this.ldapBaseDn) {
+            sites[this.ldapBaseDn] = {
+                ldapUser: this.ldapUser,
+                ldapPassword: this.ldapPassword,
+                ctUri: this.ctUri,
+                apiToken: this.apiToken,
+                specialGroupMappings: this.specialGroupMappings,
+                specialUserAttributes: this.specialUserAttributes
             }
         }
         this.sites = Object.keys(sites).map((siteName) => new CtldapSite(this, siteName, sites[siteName]));

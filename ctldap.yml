@@ -14,6 +14,12 @@ config:
   dnLowerCase: ${IS_DN_LOWER_CASE:true}
   # This is required for clients that need lowercase email addresses, e.g. Seafile
   emailLowerCase: ${IS_EMAIL_LOWER_CASE:true}
+  # Hide persons with an invitation status not accepted
+  filterInvitedPersons: ${IS_FILTER_INVITED_PERSONS:true}
+  # Create additional virtual groups for each role within a group. For example, for the group 'Event A' with the roles 'Head' and 'Participant', create the additional groups 'Event A Head' and 'Event A Participant'.
+  virtualRoleGroups: ${IS_VIRTUAL_ROLE_GROUPS:false}
+  # Hide groups without any member.
+  skipEmptyGroups: ${IS_SKIP_EMPTY_GROUPS:false}
 
   # LDAP admin user, can be a "virtual" root user or a ChurchTools username (virtual root is recommended!)
   ldapUser: ${LDAP_USER:root}
@@ -43,6 +49,12 @@ config:
       groupClass: NextCloudGroup
       personClass: NextCloudUser
 
+  # This map can be used to add special attributes to the user. They can also get dynamicly from the user
+  # by jsonpath (https://github.com/dchester/jsonpath#jsonpath-syntax) to the array returned by the API.
+  # To get an example you can access https://mysite.church.tools/api/persons?limit=5
+  #specialUserAttributes:
+  #  age: '$.age'
+
   # To use SSL/TLS, provide file names for x509 certificate and key here
   # Use this command to create a private key and a certificate:
   # openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365
@@ -70,3 +82,5 @@ sites:
 #      nextcloud:
 #        groupClass: NextCloudGroup
 #        personClass: NextCloudUser
+#    specialUserAttributes:
+#      age: '$.age'

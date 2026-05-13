@@ -7,6 +7,7 @@
  * @licence GNU/GPL v3.0
  */
 import fs from "fs";
+import jp from "jsonpath";
 import ldapjs from "ldapjs";
 import { CtldapConfig } from "./ctldap-config.js";
 import { patchLdapjsFilters } from "./ldapjs-filter-overrides.js";
@@ -163,8 +164,13 @@ async function fetchMemberships(site) {
   const result = await site.api.get('groups/members', {
     searchParams: {"with_deleted": false}
   });
-  logDebug(site, "fetchMemberships done");
-  return result['data'];
+  logDebug(site, "fetchMemberships done, found " + result['data'].length + " memberships");
+  const memberships = [];
+  result['data'].forEach((m) => {
+    m.groupId = 'g' + m.groupId
+    memberships.push(m);
+  });
+  return memberships;
 }
 
 /**
@@ -174,12 +180,20 @@ async function fetchMemberships(site) {
  */
 async function fetchPersons(site) {
   const data = await fetchAllPaginated(site, 'persons', { limit: 500 });
-  logDebug(site, "fetchPersons done");
+  logDebug(site, "fetchPersons done, found " + data.length + " persons");
   const personMap = {};
   data.forEach((p) => {
-    if (p['invitationStatus'] === "accepted") {
-      personMap[p['id']] = p;
+    const filterInvitedPersons = (site.filterInvitedPersons || ((site.filterInvitedPersons === undefined) && config.filterInvitedPersons));
+    if ((!filterInvitedPersons) || (filterInvitedPersons && p['invitationStatus'] === "accepted")) {
+      if (p['cmsUserId'] === ''){
+        p.cmsUserId = (p['firstName'] + '.' + p['lastName']).toLowerCase()
+          .replace('ö', 'oe')
+          .replace('ä', 'ae')
+          .replace('ü', 'ue')
+          .replace('ß', 'ss');
+      }
       p.dn = site.compatTransform(site.fnUserDn(p['cmsUserId']));
+      personMap[p['id']] = p;
     }
   });
   return personMap;
@@ -191,15 +205,30 @@ async function fetchPersons(site) {
  */
 async function fetchGroups(site) {
   const data = await fetchAllPaginated(site, 'groups', { limit: 100 });
-  logDebug(site, "fetchGroups done");
+  logDebug(site, "fetchGroups done, found " + data.length + " groups");
   const groupMap = {};
   const sgmKeys = Object.keys(site.specialGroupMappings);
   data.forEach((g) => {
+    
+    if (site.virtualRoleGroups || ((site.virtualRoleGroups === undefined) && config.virtualRoleGroups)) {
+      g['roles'].forEach((r) => {
+        // Create new Group for each role
+        const s = {};
+        s.dn = site.compatTransform(site.fnGroupDn(g['name'] + ' ' + r['name']));
+        s.id = 'r' + r.id;
+        s.name = g['name'] + ' ' + r['name'];
+        s.information = g.information;
+        const info = s['information'];
+        s.specialClasses = sgmKeys.filter((k) => info[k])
+        groupMap[s['id']] = s;
+      });
+    }
+
     // Strip some irrelevant information
     delete g['settings'];
-    delete g['roles'];
     // Pre-compute the "distinguished name" of this group for LDAP
     g.dn = site.compatTransform(site.fnGroupDn(g['name']));
+    g.id = 'g' + g.id;
     const info = g['information'];
     g.specialClasses = sgmKeys.filter((k) => info[k])
     groupMap[g['id']] = g;
@@ -229,6 +258,24 @@ async function fetchAll(site) {
     const [personMap, groupMap, memberships, groupTypes] = await Promise.all([
       fetchPersons(site), fetchGroups(site), fetchMemberships(site), fetchGroupTypes(site)
     ]);
+
+    if (site.virtualRoleGroups || ((site.virtualRoleGroups === undefined) && config.virtualRoleGroups)) {
+      memberships.forEach((m) => {
+        const n = structuredClone(m);
+
+        Object.entries(groupMap).forEach(([key, g]) => {
+          if (m.groupId == g.id) {
+            g.roles.forEach((r) => {
+              if (m.groupTypeRoleId == r.groupTypeRoleId) {
+                n.groupId = 'r' + r.id
+                memberships.push(n)
+              }
+            });
+          }
+        })
+      });
+    }
+
     // Create membership mappings
     const g2p = {}, p2g = {};
     memberships.forEach((m) => {
@@ -249,6 +296,14 @@ async function fetchAll(site) {
         }
       }
     });
+    if (site.skipEmptyGroups || ((site.skipEmptyGroups === undefined) && config.skipEmptyGroups)) {
+      Object.entries(groupMap).forEach(([key, g]) => {
+        if (!(key in g2p)) {
+          logDebug(site, "Removed empty group: " + g.dn);
+          delete groupMap[key]
+        }
+      });
+    }
     return { groupTypes, g2p, p2g, personMap, groupMap };
   });
 }
@@ -266,6 +321,13 @@ function requestUsers(req, _res, next) {
     let newCache = Object.entries(personMap).map(([id, p]) => {
       const cn = p['cmsUserId'];
       const email = site.compatTransformEmail(p['email']);
+      const extraattributes = {};
+      Object.entries(site.specialUserAttributes).forEach(([key, value]) => {
+        const uvalue = jp.query(p, value);
+        if (uvalue.length !== 0 && uvalue[0] !== null) {
+          extraattributes[key] = uvalue;
+        }
+      });
       return {
         dn: p.dn,
         attributes: {
@@ -291,7 +353,8 @@ function requestUsers(req, _res, next) {
                 .flatMap((gid) => groupMap[gid].specialClasses)
                 .map((key) => site.specialGroupMappings[key]['personClass'])
           ],
-          memberOf: (p2g[id] || []).map((gid) => groupMap[gid].dn)
+          memberOf: (p2g[id] || []).map((gid) => groupMap[gid].dn),
+          ...extraattributes
         }
       };
     });
@@ -340,8 +403,8 @@ function requestGroups(req, _res, next) {
         attributes: {
           cn,
           displayname: g['name'],
-          id,
-          nsUniqueId: `g${id}`,
+          id: id.replace(/^g/g, ''),
+          nsUniqueId: id,
           objectClass: objectClasses,
           uniqueMember: (g2p[id] || []).map((pid) => personMap[pid].dn)
         }

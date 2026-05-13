@@ -23,7 +23,8 @@ export class CtldapSite {
         // Take ldapUser from main config if not specified for site.
         this.ldapUser = site.ldapUser || config.ldapUser;
         this.ldapPassword = site.ldapPassword;
-        this.specialGroupMappings = site.specialGroupMappings;
+        this.specialGroupMappings = site.specialGroupMappings || {};
+        this.specialUserAttributes = site.specialUserAttributes || {};
         this.dnLowerCase = CtldapConfig.asOptionalBool(site.dnLowerCase);
         this.emailLowerCase = CtldapConfig.asOptionalBool(site.emailLowerCase);
         this.emailsUnique = CtldapConfig.asOptionalBool(site.emailsUnique);
