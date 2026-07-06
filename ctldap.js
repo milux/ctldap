@@ -72,6 +72,16 @@ const server = ldapjs.createServer(options);
 
 const USERS_KEY = 'users', GROUPS_KEY = 'groups', RAW_DATA_KEY = 'rawData';
 
+// Synology DSM places external-LDAP users/groups in the numeric ID range 1000000-2097151 and
+// ignores entries outside it (lower IDs are treated as reserved system accounts). Offset the
+// ChurchTools IDs into that band so DSM accepts them with its "UID/GID shift" option left OFF.
+// See https://kb.synology.com/en-us/DSM/tutorial/UID_GID_reserved_by_Synology
+const POSIX_ID_BASE = 1000000;
+// Fixed primary group that every user's gidNumber points to (implicit POSIX primary group).
+// The base value itself collides with no real group, since ChurchTools IDs start at 1.
+const PRIMARY_GID = POSIX_ID_BASE;
+const PRIMARY_GROUP_CN = "churchtools-users";
+
 /**
  * Retrieves data from cache as a Promise or refreshes the data with the provided (async) factory.
  * @param {object} site - The site for which to query the cache
@@ -273,6 +283,10 @@ function requestUsers(req, _res, next) {
           displayName: `${p['firstName']} ${p['lastName']}`,
           id,
           uid: cn,
+          // POSIX numeric IDs as strings, offset into Synology's external-LDAP range (1000000-2097151).
+          // Strings avoid the case-insensitive filter matcher calling .toLowerCase() on a number.
+          uidNumber: String(POSIX_ID_BASE + Number(id)),
+          gidNumber: String(PRIMARY_GID),
           nsUniqueId: `u${id}`,
           givenName: p['firstName'],
           street: p['street'],
@@ -283,9 +297,19 @@ function requestUsers(req, _res, next) {
           sn: p['lastName'],
           email,
           mail: email,
+          // POSIX: posixAccount lists homeDirectory as MUST; synthesize a stable path from the username.
+          homeDirectory: `/home/${cn}`,
+          // loginShell is MAY; provide a sane default. gecos is intentionally omitted: RFC2307 defines it
+          // as IA5 (ASCII), which would be violated by names containing umlauts.
+          loginShell: "/bin/sh",
           objectClass: [
+            'top',
             'person',
+            'organizationalPerson',
+            'inetOrgPerson',
             'CTPerson',
+            // POSIX: nss-ldap clients (e.g. Synology DSM) require posixAccount to recognize login users.
+            'posixAccount',
             // Map special CT field names of associated groups to the LDAP objectClass names defined in configuration.
             ...(p2g[id] || [])
                 .flatMap((gid) => groupMap[gid].specialClasses)
@@ -304,7 +328,8 @@ function requestUsers(req, _res, next) {
         attributes: {
           cn,
           displayname: "LDAP Administrator",
-          id: 0,
+          // String, like every other entry's id: filter matching calls .toLowerCase() on the value.
+          id: "0",
           uid: cn,
           nsUniqueId: "u0",
           givenName: "LDAP Administrator",
@@ -332,7 +357,9 @@ function requestGroups(req, _res, next) {
       const cn = g['name'];
       const info = g['information'];
       const groupType = groupTypes[info['groupTypeId']];
-      const objectClasses = ["group", "CTGroup" + groupType.charAt(0).toUpperCase() + groupType.slice(1),
+      const objectClasses = ["top", "group", "CTGroup" + groupType.charAt(0).toUpperCase() + groupType.slice(1),
+        // POSIX: nss-ldap clients (e.g. Synology DSM) require posixGroup to resolve groups.
+        "posixGroup",
         // Map observed special CT field names to the LDAP objectClass names defined in configuration.
         ...g.specialClasses.map((key) => site.specialGroupMappings[key]['groupClass'])];
       return {
@@ -342,10 +369,29 @@ function requestGroups(req, _res, next) {
           displayname: g['name'],
           id,
           nsUniqueId: `g${id}`,
+          // POSIX numeric group ID as string, offset into Synology's external-LDAP range (1000000-2097151).
+          gidNumber: String(POSIX_ID_BASE + Number(id)),
           objectClass: objectClasses,
-          uniqueMember: (g2p[id] || []).map((pid) => personMap[pid].dn)
+          uniqueMember: (g2p[id] || []).map((pid) => personMap[pid].dn),
+          // RFC2307 group membership: nss-ldap clients (e.g. Synology) resolve members
+          // via memberUid (bare username), not uniqueMember/DNs.
+          memberUid: (g2p[id] || []).map((pid) => personMap[pid]['cmsUserId'])
         }
       };
+    });
+    // Synthetic POSIX primary group that every user's gidNumber points to. Gives DSM a resolvable
+    // primary group without inventing per-user private groups; supplementary CT groups still resolve
+    // via memberUid on their own entries.
+    newCache.push({
+      dn: site.compatTransform(site.fnGroupDn(PRIMARY_GROUP_CN)),
+      attributes: {
+        cn: PRIMARY_GROUP_CN,
+        displayname: "ChurchTools Users",
+        id: "0",
+        nsUniqueId: "g0",
+        gidNumber: String(PRIMARY_GID),
+        objectClass: ["top", "posixGroup"]
+      }
     });
     logDebug(site, () => `Updated groups: ${newCache.length}`);
     return newCache;
@@ -354,17 +400,22 @@ function requestGroups(req, _res, next) {
 }
 
 /**
- * Validates root user authentication by comparing the bind DN with the configured admin DN.
+ * Authorizes a search: the admin bind, or any connection that has completed a successful
+ * authentication (see authenticate(), which sets `_ctAuthenticated` on the connection).
+ * Clients such as Synology DSM bind as the user and then search (e.g. to resolve the user's
+ * own groups) during login, so restricting searches to the admin bind alone breaks their login.
+ * Anonymous/unauthenticated connections remain rejected.
  * @param {object} req - Request object
  * @param {object} _res - Response object
  * @param {function} next - Next handler function of filter chain
  */
 function authorize(req, _res, next) {
-  if (!req.connection.ldap.bindDN.equals(req.site.adminDn)) {
-    logWarn(req.site, "Rejected search without proper binding!");
-    return next(new InsufficientAccessRightsError());
+  const ldapConn = req.connection.ldap;
+  if (ldapConn.bindDN.equals(req.site.adminDn) || ldapConn._ctAuthenticated === true) {
+    return next();
   }
-  return next();
+  logWarn(req.site, () => `Rejected search from unauthenticated bind: ${ldapConn.bindDN.toString()}`);
+  return next(new InsufficientAccessRightsError());
 }
 
 /**
@@ -376,6 +427,37 @@ function authorize(req, _res, next) {
 function searchLogging(req, _res, next) {
   logDebug(req.site, () => `SEARCH base object: ${req.dn.toString()} scope: ${req.scopeName}`);
   logDebug(req.site, () => `Filter: ${req.filter.toString()}`);
+  return next();
+}
+
+/**
+ * Works around an ldapjs bug in SearchResponse.send(): it compares the client's requested
+ * attribute list (kept in the client's original case) against lower-cased entry attribute names,
+ * so any mixed-case attribute (uidNumber, gidNumber, memberUid, objectClass, objectClasses,
+ * attributeTypes, subschemaSubentry, ...) is stripped from the response whenever a client
+ * requests it by name in non-lowercase form (as nss-ldap clients like Synology DSM do).
+ * Lower-casing the requested list makes the comparison effectively case-insensitive. This is safe:
+ * LDAP attribute descriptors are case-insensitive, and the returned attribute *names* are taken
+ * from the entry itself, not from this list.
+ * @param {object} req - Request object
+ * @param {object} res - Response object
+ * @param {function} next - Next handler function of filter chain
+ */
+function lowerCaseRequestedAttributes(req, res, next) {
+  const lowerInPlace = (arr) => {
+    if (Array.isArray(arr)) {
+      for (let i = 0; i < arr.length; i++) {
+        if (typeof arr[i] === "string") {
+          arr[i] = arr[i].toLowerCase();
+        }
+      }
+    }
+  };
+  lowerInPlace(req.attributes);
+  // res.attributes is what SearchResponse.send() actually consults; it may be a separate array.
+  if (res && res.attributes !== req.attributes) {
+    lowerInPlace(res.attributes);
+  }
   return next();
 }
 
@@ -447,6 +529,8 @@ async function authenticate(req, _res, next) {
       try {
         await site.authenticateAdmin(req.credentials);
         logDebug(site, "Admin bind successful");
+        // Mark the connection as authenticated so subsequent searches are authorized.
+        req.connection.ldap._ctAuthenticated = true;
         return next();
       } catch (error) {
         logError(site, "Invalid password for admin bind or auth error: ", error);
@@ -467,6 +551,8 @@ async function authenticate(req, _res, next) {
       }
     });
     logDebug(site, `Authentication successful for "${username}"`);
+    // Mark the connection as authenticated so subsequent searches are authorized.
+    req.connection.ldap._ctAuthenticated = true;
     return next();
   } catch (error) {
     if (error.response?.statusCode === 400) {
@@ -490,7 +576,7 @@ config.sites.forEach((site) => {
   server.search(`ou=users,o=${site.name}`, (req, _res, next) => {
     req.site = site;
     next();
-  }, searchLogging, authorize, (req, _res, next) => {
+  }, searchLogging, authorize, lowerCaseRequestedAttributes, (req, _res, next) => {
     logDebug(site, "Search for users");
     req.checkAll = req.scopeName !== "base" && req.dn.length === 2;
     return next();
@@ -500,7 +586,7 @@ config.sites.forEach((site) => {
   server.search(`ou=groups,o=${site.name}`, (req, _res, next) => {
     req.site = site;
     next();
-  }, searchLogging, authorize, (req, _res, next) => {
+  }, searchLogging, authorize, lowerCaseRequestedAttributes, (req, _res, next) => {
     logDebug(site, "Search for groups");
     req.checkAll = req.scopeName !== "base" && req.dn.length === 2;
     return next();
@@ -510,23 +596,69 @@ config.sites.forEach((site) => {
   server.search(`o=${site.name}`, (req, _res, next) => {
     req.site = site;
     next();
-  }, searchLogging, authorize, (req, _res, next) => {
+  }, searchLogging, authorize, lowerCaseRequestedAttributes, (req, _res, next) => {
     logDebug(site, "Search for users and groups combined");
     req.checkAll = req.scopeName === "subtree";
     return next();
   }, requestUsers, requestGroups, sendUsers, sendGroups, endSuccess);
 });
 
+// Subschema subentry: DSM follows subschemaSubentry from the Root DSE and requires
+// objectClasses + attributeTypes definitions here, otherwise it rejects the server
+// ("get support schema failed", ldap_server_not_support). The schema is self-contained:
+// every attribute/objectClass referenced in a MUST/MAY/SUP clause is also defined here, so
+// strict client-side parsers (Synology DSM, built on OpenLDAP libs) accept it.
+server.search('cn=subschema', lowerCaseRequestedAttributes, (req, res) => {
+  logDebug({ name: 'subschema' }, () =>
+      `Subschema request, scope: ${req.scopeName}, filter: ${req.filter.toString()}, ` +
+      `attributes: ${JSON.stringify(req.attributes)}`);
+  const obj = {
+    dn: 'cn=subschema',
+    attributes: {
+      objectClass: ['top', 'subentry', 'subschema', 'extensibleObject', 'ldapSubEntry'],
+      cn: 'subschema',
+      attributeTypes: [
+        "( 2.5.4.0 NAME 'objectClass' EQUALITY objectIdentifierMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )",
+        "( 2.5.4.3 NAME 'cn' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )",
+        "( 2.5.4.13 NAME 'description' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )",
+        "( 2.5.4.35 NAME 'userPassword' EQUALITY octetStringMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.40 )",
+        "( 0.9.2342.19200300.100.1.1 NAME 'uid' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )",
+        "( 1.3.6.1.1.1.1.0 NAME 'uidNumber' EQUALITY integerMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.27 SINGLE-VALUE )",
+        "( 1.3.6.1.1.1.1.1 NAME 'gidNumber' EQUALITY integerMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.27 SINGLE-VALUE )",
+        "( 1.3.6.1.1.1.1.12 NAME 'memberUid' EQUALITY caseExactIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )",
+        "( 1.3.6.1.1.1.1.2 NAME 'gecos' EQUALITY caseIgnoreIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )",
+        "( 1.3.6.1.1.1.1.3 NAME 'homeDirectory' EQUALITY caseExactIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )",
+        "( 1.3.6.1.1.1.1.4 NAME 'loginShell' EQUALITY caseExactIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )"
+      ],
+      objectClasses: [
+        "( 2.5.6.0 NAME 'top' ABSTRACT MUST objectClass )",
+        "( 1.3.6.1.1.1.2.0 NAME 'posixAccount' SUP top AUXILIARY MUST ( cn $ uid $ uidNumber $ gidNumber $ homeDirectory ) MAY ( userPassword $ loginShell $ gecos $ description ) )",
+        "( 1.3.6.1.1.1.2.2 NAME 'posixGroup' SUP top STRUCTURAL MUST ( cn $ gidNumber ) MAY ( userPassword $ memberUid $ description ) )"
+      ]
+    }
+  };
+  if (req.filter.matches(obj.attributes, false)) {
+    res.send(obj);
+  } else {
+    logDebug({ name: 'subschema' }, () => `Subschema filter did not match, sending no entry: ${req.filter.toString()}`);
+  }
+  res.end();
+}, endSuccess);
+
 // Search implementation for basic search for Directory Information Tree and the LDAP Root DSE
-server.search('', (req, res) => {
-  // noinspection JSUnresolvedVariable
-  logDebug({ name: req.dn.o }, "Empty request, return directory information");
-  // noinspection JSUnresolvedVariable
+server.search('', lowerCaseRequestedAttributes, (req, res) => {
+  logDebug({ name: 'root DSE' }, "Empty request, return directory information");
   const obj = {
     "attributes": {
       "objectClass": ["top", "OpenLDAProotDSE"],
       "subschemaSubentry": ["cn=subschema"],
-      "namingContexts": `o=${req.dn.o}`,
+      // Advertise the actual configured naming context(s). The Root DSE is queried with an empty
+      // base DN, so req.dn has no "o" component; deriving it from the request yields "o=undefined"
+      // and clients (Synology DSM) would use that bogus base DN for user/group lookups.
+      "namingContexts": config.sites.map((s) => `o=${s.name}`),
+      // DSM speaks LDAPv3. Deliberately advertise no supportedControl (e.g. paged results),
+      // so the client requests the full result set in one response instead of paging.
+      "supportedLDAPVersion": ["3"],
     },
     "dn": "",
   };
