@@ -74,7 +74,10 @@ export const patchLdapjsFilters = () => {
         })
         testValue = testValue.toLowerCase()
         return testValues({
-            rule: v => testValue === v?.toLowerCase(),
+            // Coerce to string before comparing: attribute values may be numbers (e.g. a numeric
+            // "id"), and calling .toLowerCase() directly on a non-string throws. null/undefined
+            // never match.
+            rule: v => v != null && testValue === String(v).toLowerCase(),
             value: targetAttribute
         })
     };
