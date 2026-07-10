@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:24-alpine
 LABEL maintainer="Michael Lux <michi.lux@gmail.com>"
 
 WORKDIR /app
@@ -32,5 +32,6 @@ ENV LDAP_PORT 1389
 ENV CT_URI https://mysite.church.tools/
 ENV API_TOKEN ""
 ENV CACHE_LIFETIME_MS 300000
+ENV STALE_MAX_AGE_MS 3600000
 
 CMD ["node", "ctldap.js"]

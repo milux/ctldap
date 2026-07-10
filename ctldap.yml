@@ -9,6 +9,9 @@ config:
   ldapPort: ${LDAP_PORT:1389}
   # This controls (in milliseconds) how old the user/group data can be until it is fetched from ChurchTools again
   cacheLifetime: ${CACHE_LIFETIME_MS:300000}
+  # Maximum age (in milliseconds) of stale cache data that may be served when the CT API is unavailable.
+  # Positive value: serve stale data up to this age; 0: never serve stale data; negative: no age limit.
+  staleMaxAge: ${STALE_MAX_AGE_MS:3600000}
 
   # This is required for clients using lowercase DNs, e.g. ownCloud/nextCloud
   dnLowerCase: ${IS_DN_LOWER_CASE:true}

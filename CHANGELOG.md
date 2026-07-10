@@ -1,7 +1,12 @@
 # Changelog
 
+### 3.1.4
+- Fixed: CT API failures during cache refresh returned an empty success response to LDAP clients instead of a proper LDAP error
+- Fixed: When the CT API is temporarily unavailable after a successful initial data load, stale cache data is now served transparently, preventing empty LDAP responses during CT outages
+- New config option `staleMaxAge` / `STALE_MAX_AGE_MS`: maximum age (ms) of stale data served on API errors (default: 3600000 = 1h; `0` = never serve stale; negative = no limit)
+
 ### 3.1.3
-- Updated to Node.js 20 (latest LTS)
+- Updated to Node.js 24 (latest LTS)
 - Updated all dependencies to latest versions
 - Added logger for better `ldapjs` debugging
 - Suppress warnings caused by empty attributes from e.g. NextCloud

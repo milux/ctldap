@@ -108,6 +108,19 @@ function getCached(site, key, factory) {
           co.entry = result;
           co.time = new Date().getTime();
           return result;
+        }).catch((error) => {
+          if (co.entry !== null) {
+            const staleAge = new Date().getTime() - co.time;
+            if (config.staleMaxAge < 0 || staleAge <= config.staleMaxAge) {
+              logWarn(site, `Cache refresh failed for key "${key}", `
+                  + `serving stale data (age: ${Math.round(staleAge / 1000)}s): ${error}`);
+              return co.entry;
+            }
+            logWarn(site, `Cache refresh failed for key "${key}", `
+                + `stale data too old (age: ${Math.round(staleAge / 1000)}s, `
+                + `max: ${Math.round(config.staleMaxAge / 1000)}s): ${error}`);
+          }
+          throw error;
         }).finally(() => {
           delete co.promise;
         });
@@ -142,7 +155,7 @@ async function fetchAllPaginated(site, apiPath, searchParams= {}) {
   // Get pagination meta cache
   const pCache = site.CACHE.pagination;
   // Assume the same number of pages as last time, default to 1
-  const assumedPages = pCache[site] || 1;
+  const assumedPages = pCache[site.name] || 1;
   // Fetch assumed number of pages
   const promises = range(1, assumedPages + 1).map(fetchPage);
   // Await first result
@@ -152,7 +165,7 @@ async function fetchAllPaginated(site, apiPath, searchParams= {}) {
   if (nPages !== assumedPages) {
     logDebug(site, () => `Assumed ${assumedPages} page(s) of data for /api/${apiPath}, but had to load ${nPages}.`);
     // Update meta cache
-    pCache[site] = nPages;
+    pCache[site.name] = nPages;
     // Fetch remaining pages, if any
     if (nPages > assumedPages) {
       promises.push(...range(assumedPages + 1, nPages + 1).map(fetchPage));
@@ -407,7 +420,7 @@ function sendUsers(req, res, next) {
     return next();
   }, (error) => {
     logError(req.site, "Error whilst retrieving users: ", error);
-    return next();
+    return next(new OtherError());
   });
 }
 
@@ -428,7 +441,7 @@ function sendGroups(req, res, next) {
     return next();
   }, (error) => {
     logError(req.site, "Error whilst retrieving groups: ", error);
-    return next();
+    return next(new OtherError());
   });
 }
 

@@ -24,6 +24,12 @@ export class CtldapConfig {
         } else {
             this.cacheLifetime = Number(config.cacheLifetime);
         }
+        // Maximum age of stale cache data served on API errors: positive = ms limit, 0 = never serve stale, negative = no limit
+        if (typeof config.staleMaxAge !== 'number' && isNaN(config.staleMaxAge)) {
+            this.staleMaxAge = 3600000;  // 1 hour
+        } else {
+            this.staleMaxAge = Number(config.staleMaxAge);
+        }
         this.ldapUser = config.ldapUser;
         this.ldapPassword = config.ldapPassword;
         this.ctUri = config.ctUri;
