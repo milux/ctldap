@@ -1,5 +1,8 @@
 # Changelog
 
+### 3.1.5
+- Dependency updates
+
 ### 3.1.4
 - Fixed: CT API failures during cache refresh returned an empty success response to LDAP clients instead of a proper LDAP error
 - Fixed: When the CT API is temporarily unavailable after a successful initial data load, stale cache data is now served transparently, preventing empty LDAP responses during CT outages
