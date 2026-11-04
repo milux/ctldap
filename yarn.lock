@@ -5,34 +5,6 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"@emnapi/core@npm:^1.3.1":
-  version: 1.3.1
-  resolution: "@emnapi/core@npm:1.3.1"
-  dependencies:
-    "@emnapi/wasi-threads": "npm:1.0.1"
-    tslib: "npm:^2.4.0"
-  checksum: 10c0/d3be1044ad704e2c486641bc18908523490f28c7d38bd12d9c1d4ce37d39dae6c4aecd2f2eaf44c6e3bd90eaf04e0591acc440b1b038cdf43cce078a355a0ea0
-  languageName: node
-  linkType: hard
-
-"@emnapi/runtime@npm:^1.3.1":
-  version: 1.3.1
-  resolution: "@emnapi/runtime@npm:1.3.1"
-  dependencies:
-    tslib: "npm:^2.4.0"
-  checksum: 10c0/060ffede50f1b619c15083312b80a9e62a5b0c87aa8c1b54854c49766c9d69f8d1d3d87bd963a647071263a320db41b25eaa50b74d6a80dcc763c23dbeaafd6c
-  languageName: node
-  linkType: hard
-
-"@emnapi/wasi-threads@npm:1.0.1":
-  version: 1.0.1
-  resolution: "@emnapi/wasi-threads@npm:1.0.1"
-  dependencies:
-    tslib: "npm:^2.4.0"
-  checksum: 10c0/1e0c8036b8d53e9b07cc9acf021705ef6c86ab6b13e1acda7fffaf541a2d3565072afb92597419173ced9ea14f6bf32fce149106e669b5902b825e8b499e5c6c
-  languageName: node
-  linkType: hard
-
 "@keyv/serialize@npm:^1.1.1":
   version: 1.1.1
   resolution: "@keyv/serialize@npm:1.1.1"
@@ -129,135 +101,114 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@napi-rs/wasm-runtime@npm:^0.2.5":
-  version: 0.2.7
-  resolution: "@napi-rs/wasm-runtime@npm:0.2.7"
-  dependencies:
-    "@emnapi/core": "npm:^1.3.1"
-    "@emnapi/runtime": "npm:^1.3.1"
-    "@tybys/wasm-util": "npm:^0.9.0"
-  checksum: 10c0/04a5edd79144bfa4e821a373fb6d4939f10c578c5f3633b5e67a57d0f5e36a593f595834d26654ea757bba7cd80b6c42d0d1405d6a8460c5d774e8cd5c9548a4
-  languageName: node
-  linkType: hard
-
-"@node-rs/argon2-android-arm-eabi@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-android-arm-eabi@npm:2.0.2"
+"@node-rs/argon2-android-arm-eabi@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-android-arm-eabi@npm:2.2.2"
   conditions: os=android & cpu=arm
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-android-arm64@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-android-arm64@npm:2.0.2"
+"@node-rs/argon2-android-arm64@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-android-arm64@npm:2.2.2"
   conditions: os=android & cpu=arm64
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-darwin-arm64@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-darwin-arm64@npm:2.0.2"
+"@node-rs/argon2-darwin-arm64@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-darwin-arm64@npm:2.2.2"
   conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-darwin-x64@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-darwin-x64@npm:2.0.2"
+"@node-rs/argon2-darwin-x64@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-darwin-x64@npm:2.2.2"
   conditions: os=darwin & cpu=x64
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-freebsd-x64@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-freebsd-x64@npm:2.0.2"
+"@node-rs/argon2-freebsd-x64@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-freebsd-x64@npm:2.2.2"
   conditions: os=freebsd & cpu=x64
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-linux-arm-gnueabihf@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-linux-arm-gnueabihf@npm:2.0.2"
+"@node-rs/argon2-linux-arm-gnueabihf@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-linux-arm-gnueabihf@npm:2.2.2"
   conditions: os=linux & cpu=arm
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-linux-arm64-gnu@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-linux-arm64-gnu@npm:2.0.2"
+"@node-rs/argon2-linux-arm64-gnu@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-linux-arm64-gnu@npm:2.2.2"
   conditions: os=linux & cpu=arm64 & libc=glibc
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-linux-arm64-musl@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-linux-arm64-musl@npm:2.0.2"
+"@node-rs/argon2-linux-arm64-musl@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-linux-arm64-musl@npm:2.2.2"
   conditions: os=linux & cpu=arm64 & libc=musl
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-linux-x64-gnu@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-linux-x64-gnu@npm:2.0.2"
+"@node-rs/argon2-linux-x64-gnu@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-linux-x64-gnu@npm:2.2.2"
   conditions: os=linux & cpu=x64 & libc=glibc
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-linux-x64-musl@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-linux-x64-musl@npm:2.0.2"
+"@node-rs/argon2-linux-x64-musl@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-linux-x64-musl@npm:2.2.2"
   conditions: os=linux & cpu=x64 & libc=musl
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-wasm32-wasi@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-wasm32-wasi@npm:2.0.2"
-  dependencies:
-    "@napi-rs/wasm-runtime": "npm:^0.2.5"
-  conditions: cpu=wasm32
-  languageName: node
-  linkType: hard
-
-"@node-rs/argon2-win32-arm64-msvc@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-win32-arm64-msvc@npm:2.0.2"
+"@node-rs/argon2-win32-arm64-msvc@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-win32-arm64-msvc@npm:2.2.2"
   conditions: os=win32 & cpu=arm64
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-win32-ia32-msvc@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-win32-ia32-msvc@npm:2.0.2"
+"@node-rs/argon2-win32-ia32-msvc@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-win32-ia32-msvc@npm:2.2.2"
   conditions: os=win32 & cpu=ia32
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-win32-x64-msvc@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2-win32-x64-msvc@npm:2.0.2"
+"@node-rs/argon2-win32-x64-msvc@npm:2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2-win32-x64-msvc@npm:2.2.2"
   conditions: os=win32 & cpu=x64
   languageName: node
   linkType: hard
 
-"@node-rs/argon2@npm:^2.0.2":
-  version: 2.0.2
-  resolution: "@node-rs/argon2@npm:2.0.2"
+"@node-rs/argon2@npm:^2.2.2":
+  version: 2.2.2
+  resolution: "@node-rs/argon2@npm:2.2.2"
   dependencies:
-    "@node-rs/argon2-android-arm-eabi": "npm:2.0.2"
-    "@node-rs/argon2-android-arm64": "npm:2.0.2"
-    "@node-rs/argon2-darwin-arm64": "npm:2.0.2"
-    "@node-rs/argon2-darwin-x64": "npm:2.0.2"
-    "@node-rs/argon2-freebsd-x64": "npm:2.0.2"
-    "@node-rs/argon2-linux-arm-gnueabihf": "npm:2.0.2"
-    "@node-rs/argon2-linux-arm64-gnu": "npm:2.0.2"
-    "@node-rs/argon2-linux-arm64-musl": "npm:2.0.2"
-    "@node-rs/argon2-linux-x64-gnu": "npm:2.0.2"
-    "@node-rs/argon2-linux-x64-musl": "npm:2.0.2"
-    "@node-rs/argon2-wasm32-wasi": "npm:2.0.2"
-    "@node-rs/argon2-win32-arm64-msvc": "npm:2.0.2"
-    "@node-rs/argon2-win32-ia32-msvc": "npm:2.0.2"
-    "@node-rs/argon2-win32-x64-msvc": "npm:2.0.2"
+    "@node-rs/argon2-android-arm-eabi": "npm:2.2.2"
+    "@node-rs/argon2-android-arm64": "npm:2.2.2"
+    "@node-rs/argon2-darwin-arm64": "npm:2.2.2"
+    "@node-rs/argon2-darwin-x64": "npm:2.2.2"
+    "@node-rs/argon2-freebsd-x64": "npm:2.2.2"
+    "@node-rs/argon2-linux-arm-gnueabihf": "npm:2.2.2"
+    "@node-rs/argon2-linux-arm64-gnu": "npm:2.2.2"
+    "@node-rs/argon2-linux-arm64-musl": "npm:2.2.2"
+    "@node-rs/argon2-linux-x64-gnu": "npm:2.2.2"
+    "@node-rs/argon2-linux-x64-musl": "npm:2.2.2"
+    "@node-rs/argon2-win32-arm64-msvc": "npm:2.2.2"
+    "@node-rs/argon2-win32-ia32-msvc": "npm:2.2.2"
+    "@node-rs/argon2-win32-x64-msvc": "npm:2.2.2"
   dependenciesMeta:
     "@node-rs/argon2-android-arm-eabi":
       optional: true
@@ -279,136 +230,124 @@ __metadata:
       optional: true
     "@node-rs/argon2-linux-x64-musl":
       optional: true
-    "@node-rs/argon2-wasm32-wasi":
-      optional: true
     "@node-rs/argon2-win32-arm64-msvc":
       optional: true
     "@node-rs/argon2-win32-ia32-msvc":
       optional: true
     "@node-rs/argon2-win32-x64-msvc":
       optional: true
-  checksum: 10c0/0513244f8b820cd38e3b3dc8ad4dbee2f2ada3ba37714c3975dbf801df26ab906b420fb769c171fee0ac06caff9e0471c827e18876f55568ea234b9b48e6da53
+  checksum: 10c0/afa772d7021b9ae2895d870ed47b838d24f11f65386e84771230da065f66febd17c81ea116c7f14c6eadd779c511eeafafb71361a63abf4b6a06a20a1ae46e8f
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-android-arm-eabi@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-android-arm-eabi@npm:1.10.7"
+"@node-rs/bcrypt-android-arm-eabi@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-android-arm-eabi@npm:1.10.9"
   conditions: os=android & cpu=arm
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-android-arm64@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-android-arm64@npm:1.10.7"
+"@node-rs/bcrypt-android-arm64@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-android-arm64@npm:1.10.9"
   conditions: os=android & cpu=arm64
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-darwin-arm64@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-darwin-arm64@npm:1.10.7"
+"@node-rs/bcrypt-darwin-arm64@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-darwin-arm64@npm:1.10.9"
   conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-darwin-x64@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-darwin-x64@npm:1.10.7"
+"@node-rs/bcrypt-darwin-x64@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-darwin-x64@npm:1.10.9"
   conditions: os=darwin & cpu=x64
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-freebsd-x64@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-freebsd-x64@npm:1.10.7"
+"@node-rs/bcrypt-freebsd-x64@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-freebsd-x64@npm:1.10.9"
   conditions: os=freebsd & cpu=x64
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-linux-arm-gnueabihf@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-linux-arm-gnueabihf@npm:1.10.7"
+"@node-rs/bcrypt-linux-arm-gnueabihf@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-linux-arm-gnueabihf@npm:1.10.9"
   conditions: os=linux & cpu=arm
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-linux-arm64-gnu@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-linux-arm64-gnu@npm:1.10.7"
+"@node-rs/bcrypt-linux-arm64-gnu@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-linux-arm64-gnu@npm:1.10.9"
   conditions: os=linux & cpu=arm64 & libc=glibc
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-linux-arm64-musl@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-linux-arm64-musl@npm:1.10.7"
+"@node-rs/bcrypt-linux-arm64-musl@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-linux-arm64-musl@npm:1.10.9"
   conditions: os=linux & cpu=arm64 & libc=musl
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-linux-x64-gnu@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-linux-x64-gnu@npm:1.10.7"
+"@node-rs/bcrypt-linux-x64-gnu@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-linux-x64-gnu@npm:1.10.9"
   conditions: os=linux & cpu=x64 & libc=glibc
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-linux-x64-musl@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-linux-x64-musl@npm:1.10.7"
+"@node-rs/bcrypt-linux-x64-musl@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-linux-x64-musl@npm:1.10.9"
   conditions: os=linux & cpu=x64 & libc=musl
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-wasm32-wasi@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-wasm32-wasi@npm:1.10.7"
-  dependencies:
-    "@napi-rs/wasm-runtime": "npm:^0.2.5"
-  conditions: cpu=wasm32
-  languageName: node
-  linkType: hard
-
-"@node-rs/bcrypt-win32-arm64-msvc@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-win32-arm64-msvc@npm:1.10.7"
+"@node-rs/bcrypt-win32-arm64-msvc@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-win32-arm64-msvc@npm:1.10.9"
   conditions: os=win32 & cpu=arm64
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-win32-ia32-msvc@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-win32-ia32-msvc@npm:1.10.7"
+"@node-rs/bcrypt-win32-ia32-msvc@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-win32-ia32-msvc@npm:1.10.9"
   conditions: os=win32 & cpu=ia32
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt-win32-x64-msvc@npm:1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt-win32-x64-msvc@npm:1.10.7"
+"@node-rs/bcrypt-win32-x64-msvc@npm:1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt-win32-x64-msvc@npm:1.10.9"
   conditions: os=win32 & cpu=x64
   languageName: node
   linkType: hard
 
-"@node-rs/bcrypt@npm:^1.10.7":
-  version: 1.10.7
-  resolution: "@node-rs/bcrypt@npm:1.10.7"
+"@node-rs/bcrypt@npm:^1.10.9":
+  version: 1.10.9
+  resolution: "@node-rs/bcrypt@npm:1.10.9"
   dependencies:
-    "@node-rs/bcrypt-android-arm-eabi": "npm:1.10.7"
-    "@node-rs/bcrypt-android-arm64": "npm:1.10.7"
-    "@node-rs/bcrypt-darwin-arm64": "npm:1.10.7"
-    "@node-rs/bcrypt-darwin-x64": "npm:1.10.7"
-    "@node-rs/bcrypt-freebsd-x64": "npm:1.10.7"
-    "@node-rs/bcrypt-linux-arm-gnueabihf": "npm:1.10.7"
-    "@node-rs/bcrypt-linux-arm64-gnu": "npm:1.10.7"
-    "@node-rs/bcrypt-linux-arm64-musl": "npm:1.10.7"
-    "@node-rs/bcrypt-linux-x64-gnu": "npm:1.10.7"
-    "@node-rs/bcrypt-linux-x64-musl": "npm:1.10.7"
-    "@node-rs/bcrypt-wasm32-wasi": "npm:1.10.7"
-    "@node-rs/bcrypt-win32-arm64-msvc": "npm:1.10.7"
-    "@node-rs/bcrypt-win32-ia32-msvc": "npm:1.10.7"
-    "@node-rs/bcrypt-win32-x64-msvc": "npm:1.10.7"
+    "@node-rs/bcrypt-android-arm-eabi": "npm:1.10.9"
+    "@node-rs/bcrypt-android-arm64": "npm:1.10.9"
+    "@node-rs/bcrypt-darwin-arm64": "npm:1.10.9"
+    "@node-rs/bcrypt-darwin-x64": "npm:1.10.9"
+    "@node-rs/bcrypt-freebsd-x64": "npm:1.10.9"
+    "@node-rs/bcrypt-linux-arm-gnueabihf": "npm:1.10.9"
+    "@node-rs/bcrypt-linux-arm64-gnu": "npm:1.10.9"
+    "@node-rs/bcrypt-linux-arm64-musl": "npm:1.10.9"
+    "@node-rs/bcrypt-linux-x64-gnu": "npm:1.10.9"
+    "@node-rs/bcrypt-linux-x64-musl": "npm:1.10.9"
+    "@node-rs/bcrypt-win32-arm64-msvc": "npm:1.10.9"
+    "@node-rs/bcrypt-win32-ia32-msvc": "npm:1.10.9"
+    "@node-rs/bcrypt-win32-x64-msvc": "npm:1.10.9"
   dependenciesMeta:
     "@node-rs/bcrypt-android-arm-eabi":
       optional: true
@@ -430,15 +369,13 @@ __metadata:
       optional: true
     "@node-rs/bcrypt-linux-x64-musl":
       optional: true
-    "@node-rs/bcrypt-wasm32-wasi":
-      optional: true
     "@node-rs/bcrypt-win32-arm64-msvc":
       optional: true
     "@node-rs/bcrypt-win32-ia32-msvc":
       optional: true
     "@node-rs/bcrypt-win32-x64-msvc":
       optional: true
-  checksum: 10c0/1718d36fed02936631faf727440318cde4f5b12efc9be44c1aa31316f30a392c39c1bb6578c8ce8c5642877785da7fda980149024291026523e8b29700e57b9b
+  checksum: 10c0/e787d4cee0c8d4ee499fdb080d2439ed5851c40757384d370035b3c8cfbd91fe58d6e79f4828613544f00fdba500a28cbb7b33bbb61449ba2eb44d1876513ef2
   languageName: node
   linkType: hard
 
@@ -460,15 +397,6 @@ __metadata:
   version: 8.1.0
   resolution: "@sindresorhus/is@npm:8.1.0"
   checksum: 10c0/45e17a558af61fc7f0ee891a48060961f25534fc3836c464146f836d0df32f19fc4fa326c3f195186f104a81ee17253885f7b2dc71abe052e8f18fc233cfa790
-  languageName: node
-  linkType: hard
-
-"@tybys/wasm-util@npm:^0.9.0":
-  version: 0.9.0
-  resolution: "@tybys/wasm-util@npm:0.9.0"
-  dependencies:
-    tslib: "npm:^2.4.0"
-  checksum: 10c0/f9fde5c554455019f33af6c8215f1a1435028803dc2a2825b077d812bed4209a1a64444a4ca0ce2ea7e1175c8d88e2f9173a36a33c199e8a5c671aa31de8242d
   languageName: node
   linkType: hard
 
@@ -575,13 +503,13 @@ __metadata:
     "@ldapjs/filter": "npm:^2.1.1"
     "@ldapjs/messages": "npm:^1.3.0"
     "@ldapjs/protocol": "npm:^1.2.1"
-    "@node-rs/argon2": "npm:^2.0.2"
-    "@node-rs/bcrypt": "npm:^1.10.7"
+    "@node-rs/argon2": "npm:^2.2.2"
+    "@node-rs/bcrypt": "npm:^1.10.9"
     got: "npm:^15.1.0"
     ldap-escape: "npm:^2.0.6"
     ldapjs: "npm:^3.0.7"
-    pino: "npm:^10.3.1"
-    pino-pretty: "npm:^13.1.3"
+    pino: "npm:^10.4.0"
+    pino-pretty: "npm:^13.2.0"
     tough-cookie: "npm:^6.0.2"
     yaml-env-defaults: "npm:^2.0.5"
   languageName: unknown
@@ -792,7 +720,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"on-exit-leak-free@npm:^2.1.0":
+"on-exit-leak-free@npm:^2.1.0, on-exit-leak-free@npm:^2.1.2":
   version: 2.1.2
   resolution: "on-exit-leak-free@npm:2.1.2"
   checksum: 10c0/faea2e1c9d696ecee919026c32be8d6a633a7ac1240b3b87e944a380e8a11dc9c95c4a1f8fb0568de7ab8db3823e790f12bda45296b1d111e341aad3922a0570
@@ -817,9 +745,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pino-pretty@npm:^13.1.3":
-  version: 13.1.3
-  resolution: "pino-pretty@npm:13.1.3"
+"pino-pretty@npm:^13.2.0":
+  version: 13.2.0
+  resolution: "pino-pretty@npm:13.2.0"
   dependencies:
     colorette: "npm:^2.0.7"
     dateformat: "npm:^4.6.3"
@@ -828,15 +756,15 @@ __metadata:
     help-me: "npm:^5.0.0"
     joycon: "npm:^3.1.1"
     minimist: "npm:^1.2.6"
-    on-exit-leak-free: "npm:^2.1.0"
+    on-exit-leak-free: "npm:^2.1.2"
     pino-abstract-transport: "npm:^3.0.0"
-    pump: "npm:^3.0.0"
-    secure-json-parse: "npm:^4.0.0"
-    sonic-boom: "npm:^4.0.1"
-    strip-json-comments: "npm:^5.0.2"
+    pump: "npm:^3.0.3"
+    secure-json-parse: "npm:^4.1.0"
+    sonic-boom: "npm:^5.0.0"
+    strip-json-comments: "npm:^5.0.3"
   bin:
     pino-pretty: bin.js
-  checksum: 10c0/36fa382521a893290c8f6a5b2ddc28dfb87fda1d161adb6b97d80bf7d24184970d0a7eab6f8ee45c39aff4b2ec3b2e533c756899798adc270010f34ba4411063
+  checksum: 10c0/177ec6c590ac1e626961ca3913aa8ffc9a8e6127d3d099a072dc04027ad74fe90a73f0162c952319c416cfaa362c76a5fedbfe2b96d52c15a44162b78df68a77
   languageName: node
   linkType: hard
 
@@ -847,9 +775,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pino@npm:^10.3.1":
-  version: 10.3.1
-  resolution: "pino@npm:10.3.1"
+"pino@npm:^10.4.0":
+  version: 10.4.0
+  resolution: "pino@npm:10.4.0"
   dependencies:
     "@pinojs/redact": "npm:^0.4.0"
     atomic-sleep: "npm:^1.0.0"
@@ -858,13 +786,13 @@ __metadata:
     pino-std-serializers: "npm:^7.0.0"
     process-warning: "npm:^5.0.0"
     quick-format-unescaped: "npm:^4.0.3"
-    real-require: "npm:^0.2.0"
+    real-require: "npm:^1.0.0"
     safe-stable-stringify: "npm:^2.3.1"
     sonic-boom: "npm:^4.0.1"
     thread-stream: "npm:^4.0.0"
   bin:
     pino: bin.js
-  checksum: 10c0/ae1c57f2baac85dd5d63a3500746d5ea1cfc4bfcbf356eaec94d42a782eeb80caa4d4614de43a036cf48e2aed46d855a7ff21b126f55a63811def52a894ef937
+  checksum: 10c0/225cb0e450c13ecdc8cd33617f69ebc62d0ae72b4cc4ec3387e58895c623461e6502772cab9afc675a9ec798a4ff9077efba17b70fdc458f11d9404a1eaf090c
   languageName: node
   linkType: hard
 
@@ -889,13 +817,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pump@npm:^3.0.0":
-  version: 3.0.0
-  resolution: "pump@npm:3.0.0"
+"pump@npm:^3.0.3":
+  version: 3.0.4
+  resolution: "pump@npm:3.0.4"
   dependencies:
     end-of-stream: "npm:^1.1.0"
     once: "npm:^1.3.1"
-  checksum: 10c0/bbdeda4f747cdf47db97428f3a135728669e56a0ae5f354a9ac5b74556556f5446a46f720a8f14ca2ece5be9b4d5d23c346db02b555f46739934cc6c093a5478
+  checksum: 10c0/2780e66b5471c19e3e3e1063b84f3f6a3a08367f24c5ed552f98cd5901e6ada27c7ad6495d4244f553fd03b01884a4561933064f053f47c8994d84fd352768ea
   languageName: node
   linkType: hard
 
@@ -910,13 +838,6 @@ __metadata:
   version: 5.1.1
   resolution: "quick-lru@npm:5.1.1"
   checksum: 10c0/a24cba5da8cec30d70d2484be37622580f64765fb6390a928b17f60cd69e8dbd32a954b3ff9176fa1b86d86ff2ba05252fae55dc4d40d0291c60412b0ad096da
-  languageName: node
-  linkType: hard
-
-"real-require@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "real-require@npm:0.2.0"
-  checksum: 10c0/23eea5623642f0477412ef8b91acd3969015a1501ed34992ada0e3af521d3c865bb2fe4cdbfec5fe4b505f6d1ef6a03e5c3652520837a8c3b53decff7e74b6a0
   languageName: node
   linkType: hard
 
@@ -950,10 +871,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"secure-json-parse@npm:^4.0.0":
-  version: 4.1.0
-  resolution: "secure-json-parse@npm:4.1.0"
-  checksum: 10c0/52b3f8125ea974db1333a5b63e6a1df550c36c0d5f9a263911d6732812bd02e938b30be324dcbbb9da3ef9bf5a84849e0dd911f56544003d3c09e8eee12504de
+"secure-json-parse@npm:^4.1.0":
+  version: 4.1.1
+  resolution: "secure-json-parse@npm:4.1.1"
+  checksum: 10c0/a34c69bc42a9112213f6c79fd9ab227396015b1f3c788fc18b66a8f00f285cfbba4e3b2ca9b8b202ff1268a85fbd92a7d6114f8164ea29a45330d5636db7440f
   languageName: node
   linkType: hard
 
@@ -966,6 +887,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"sonic-boom@npm:^5.0.0":
+  version: 5.0.2
+  resolution: "sonic-boom@npm:5.0.2"
+  dependencies:
+    atomic-sleep: "npm:^1.0.0"
+  checksum: 10c0/557e2661c67cadf9c4188f3d018c4dbaedd66db6a113d28d4590e538b03f9f3069c4635f973211b9b98ea74e6dfe2b8723b6b9a044378f36b44e9c3ad09d0279
+  languageName: node
+  linkType: hard
+
 "split2@npm:^4.0.0":
   version: 4.2.0
   resolution: "split2@npm:4.2.0"
@@ -973,7 +903,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"strip-json-comments@npm:^5.0.2":
+"strip-json-comments@npm:^5.0.3":
   version: 5.0.3
   resolution: "strip-json-comments@npm:5.0.3"
   checksum: 10c0/daaf20b29f69fb51112698f4a9a662490dbb78d5baf6127c75a0a83c2ac6c078a8c0f74b389ad5e0519d6fc359c4a57cb9971b1ae201aef62ce45a13247791e0
@@ -1020,13 +950,6 @@ __metadata:
   dependencies:
     tldts: "npm:^7.0.5"
   checksum: 10c0/5ff521a476a3c540821352125a5d481c8d2fe16035de7e0efda4df120f290c95500a0e9b51ea0aa56343955be482e014c30f5ba73e04b93ba138e4e855cb9e89
-  languageName: node
-  linkType: hard
-
-"tslib@npm:^2.4.0":
-  version: 2.6.2
-  resolution: "tslib@npm:2.6.2"
-  checksum: 10c0/e03a8a4271152c8b26604ed45535954c0a45296e32445b4b87f8a5abdb2421f40b59b4ca437c4346af0f28179780d604094eb64546bee2019d903d01c6c19bdb
   languageName: node
   linkType: hard
 
