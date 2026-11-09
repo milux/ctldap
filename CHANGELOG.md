@@ -1,5 +1,8 @@
 # Changelog
 
+### 3.1.6
+- Session credential merge bug fixed
+
 ### 3.1.5
 - Dependency updates
 

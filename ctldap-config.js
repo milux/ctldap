@@ -1,6 +1,6 @@
 /**
  * ctldap - ChurchTools LDAP-Wrapper 3.0
- * @copyright 2017-2023 Michael Lux
+ * @copyright 2017-2026 Michael Lux
  * @licence GNU/GPL v3.0
  */
 import { readYamlEnvSync } from "yaml-env-defaults";

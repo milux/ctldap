@@ -1,7 +1,7 @@
 /**
  * ctldap - ChurchTools LDAP-Wrapper 3.0
  * This tool requires a node.js-Server and a recent version of ChurchTools 3
- * @copyright 2017-2023 Michael Lux
+ * @copyright 2017-2026 Michael Lux
  * @copyright 2019-2020 Matthias Huber
  * @copyright André Schild
  * @licence GNU/GPL v3.0
@@ -484,7 +484,7 @@ async function authenticate(req, _res, next) {
   }
   const username = parseDN(req.dn).rdnAt(0).getValue("cn");
   try {
-    await site.api.post('login', {
+    await site.loginApi.post('login', {
       json: {
         "username": username,
         "password": req.credentials
